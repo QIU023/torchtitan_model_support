@@ -1,0 +1,7 @@
+- [RFCs stay short and local](upstream-rfc-short-local-maintainers-own-tracking.md) — don't post RFCs or open tracking lists; user DMs maintainers, K3 RFC lesson
+- [Model PRs reuse titan modules](upstream-model-pr-reuse-titan-modules.md) — HF only as numerics oracle; lessons from maintainers' reviews only (#4025)
+- [MiniMax M3 integration](minimax-m3-integration.md) — branches minimax_m3 (FSDP2) and minimax_m3_5d (TP/EP/PP) pushed to fork 10-24, no PR yet; both PR bodies written, 5D as [DO NOT MERGE] draft
+- [Commit attribution: titan vs logbook](commit-attribution-titan-vs-logbook.md) — titan commits never get Claude trailers; logbook commits may
+- [Flex bwd autotune capture-order bug](flex-bwd-autotune-capture-order-bug.md) — 2+ captured mask_mod tensors get misordered in backward autotune; capture one tensor
+- [Flex automatic-dynamic PP numerics](flex-automatic-dynamic-pp-numerics.md) — VLM PP grads drift: tower compiles flex first, decoder recompiles dynamic; compare with automatic_dynamic_shapes=False
+- [Sparse-attention CP gap](sparse-attention-cp-gap.md) — no titan CP for DSV4/M3/GLM-5 sparse attention; attn_gym indexer lacks query-chunk mode; DeepSeek/Megatron design = halo + all-gather compressed KV
