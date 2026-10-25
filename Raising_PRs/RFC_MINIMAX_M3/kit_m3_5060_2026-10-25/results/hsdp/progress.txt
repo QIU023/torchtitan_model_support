@@ -1,0 +1,15 @@
+07:36:05 tree 9a5ab9ebe dirty=0 torch 2.16.0.dev20261024+cu130
+07:36:21 no seed, stop
+# relaunch with the FA shim
+07:38:03 tree 9a5ab9ebe dirty=0 torch 2.16.0.dev20261024+cu130
+07:38:21 seed written
+07:39:28 warm fsdp4 rc=0 shim=4 seed_loaded=4 mesh=pp= last=10 3.819148063659668 1.4246108531951904
+07:40:09 warm hsdp2x2 rc=0 shim=4 seed_loaded=4 mesh=pp= last=10 3.8189876079559326 1.4227569103240967
+07:40:58 measured fsdp4_a rc=0 shim=4 seed_loaded=4 mesh=pp= last=10 3.819148063659668 1.4246108531951904
+07:41:02 measured hsdp2x2 rc=0 shim=4 seed_loaded=4 mesh=pp= last=10 3.8189876079559326 1.4227569103240967
+07:41:40 measured fsdp4_b rc=0 shim=4 seed_loaded=4 mesh=pp= last=10 3.819148063659668 1.4246108531951904
+07:41:40 HSDP_DONE
+07:46:11 # reduce probe, tree 9a5ab9ebe dirty=0
+07:46:45 reduce_probe fsdp4 rc=0 wrapped=4 saved= 4 saved 159 params, calls per param [2]; step1=1 8.032692909240723 1.7898139953613281
+07:46:47 reduce_probe hsdp2x2 rc=0 wrapped=4 saved= 4 saved 159 params, calls per param [2]; step1=1 8.032692909240723 1.7898139953613281
+07:46:47 REDUCE_PROBE_DONE

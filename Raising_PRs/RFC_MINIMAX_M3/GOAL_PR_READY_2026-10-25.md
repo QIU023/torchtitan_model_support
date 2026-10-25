@@ -101,3 +101,30 @@ MiniMax M3 两个 PR（FSDP2 基线 minimax_m3 = de7806dae，5D 占位 minimax_m
 (6) 正文加 "Current scope"：支持和不支持的并行、视频、compile，以及 MSA 选块和 KL 用 PyTorch 分块循环、带 host 同步，融合 kernel 是后续工作。
 titan 的提交和正文不带 Claude 署名；发 issue、开 PR、force-push 已经公开的分支，都先问用户。
 ```
+
+## 进度（10-25 5060 会话，细节见 `CHECKS_2026-10-25.md`）
+
+1. **HSDP：数据和定位都完成，正文已写。**
+   - 第 1、2 步 loss 和 grad norm 逐位；fsdp4 跑两次，10 步全同。
+   - 第 3 步起的差定位到 FSDP 规约的求和顺序：两格的规约输入逐位相同，两边的第 1 步梯度都能按各自的求和树逐位重建。
+   - README 和 5D 正文保留 HSDP；5D 的 Summary 改成不暗示 HSDP 和 TP / EP / PP 组合测过。
+   - 表是 5060 测的，正文里写不写由用户定。
+2. **CPU 全量：完成。**
+   - 基线 1930 passed、5D 1932 passed，main 1906 passed；三棵树都是 18 skipped、3 xfailed，唯一的 1 failed 三棵树都有。
+   - 只在分支上失败的是 0，计数已写进两份 Test plan。
+3. **正文：完成。**
+   - 基线加了 "Changes outside `models/minimax_m3/`"，四个 prep 提交各一条，外加测试登记一条。
+   - 5D 第一行改写；两份粘贴段都没有 `#<...>`。
+4. **flex：正文和代码注释都只讲约束。**
+   - issue 草稿 `flex_bwd_capture_order/ISSUE_DRAFT_2026-10-25.md`，在本机 nightly 上复现、验证、查重过，等用户定。
+5. **amend 和 rebase：本地完成。**
+   - 基线 `9a5ab9ebe`、5D `89fc094d1`，本地备份分支各一个。
+   - force-push 等用户点头。本机 SSH 还被拒，点头之后也要先有能写的远端。
+6. **Current scope：完成。**
+   - 包括并行、视频、compile 和 CUDA graph、MSA 的分块循环和三处 host 同步、只有 debug recipe。
+
+**等用户定：**
+- force-push 两个分支（备份在同一条 `&&` 链里先推）；
+- 发不发 PyTorch issue；
+- HSDP 表用 5060 的数还是写 Pending (H100)；
+- `lm_head` 在 HSDP 下每个 micro-batch 都 all-reduce 的附带发现，要不要报给 titan。

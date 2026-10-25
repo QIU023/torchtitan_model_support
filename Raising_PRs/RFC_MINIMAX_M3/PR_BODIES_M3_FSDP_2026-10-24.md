@@ -1,27 +1,64 @@
-# MiniMax M3 FSDP2 基线 PR 及三个 prep PR 的正文（2026-10-24）
+# MiniMax M3 FSDP2 基线 PR 的正文（2026-10-24 写，10-25 改为只开两个 PR）
 
 ## 状态（不粘贴）
 
-- **10-24 晚 goal（用户："把两个PR的body写出来 FSDP2和整个5D的 ... 按照logbook的模版"）：** M3 正文按 #4577 格式重写（`PR_WRITING_RULES.md`、logbook CLAUDE.md 的 "#4577 is the reference for code and body"），排版照最近的 `PR_K3_VIDEO/PR_BODY_K3_VIDEO_2026-10-15.md`：Summary 一句话加每个组件一条、Design 嵌套 bullet、Test plan 列命令和通过数、数值放 Results。三个 prep PR 只改了两处：P1 里一条写了两句的 bullet 拆成两条；P3 的 "Kimi K2.5" 改成 "Kimi K2.7"，和树里 `kimi_k2_7` 文件夹、README 标题一致（5D 正文同样改了）。
-  - 和上一版相比改了什么（都是对着代码和测试核出来的错）：
-    - KL loss 训练的是整个 indexer（`wq`、`wk` 和它们的两个 norm），上一版写成只训 `wq`、`wk`。核对：单卡第 1 步梯度里第 1 层 indexer `q_norm` / `k_norm` 的梯度范数都是 1.8e-3，不是 0。
+- **10-25（goal：两个 PR 达到 #4025 的合入标准，见 `GOAL_PR_READY_2026-10-25.md`；5060 会话）：**
+  - 只开两个 PR：四个 prep 提交留在基线里。
+    - 正文照 #4025 加了 "Changes outside `models/minimax_m3/`"，每个 prep 提交一条，内容取自下面三份旧 prep 正文；
+    - P2 那条带上 Qwen3.5 前后每步 loss 相同的检查；
+    - 最后一条是 M3 提交本身在共享测试和 README 里的登记。
+    - Summary 里的 `#<P1>` / `#<P2>` / `#<P3>` 换成一句"前四个提交是共享代码的准备"。
+    - 下面三份 prep 正文不再使用，留作出处。
+  - 第 1 条 HSDP：Results 加了第二张表和五条说明，细节和定位见 `CHECKS_2026-10-25.md`。
+    - 第 1、2 步 loss 和 grad norm 都逐位；
+    - fsdp4 跑两次，10 步全同；
+    - 差异定位到 FSDP 规约的求和顺序，两边的第 1 步梯度都能从截获的规约输入逐位重建。
+  - 第 4 条：Design 里 "One capture is deliberate: flex backward autotuning binds ..." 那条删了，只留 "Its `mask_mod` captures one `[T, G, S, 2]` tensor of key ranges."。
+    - 代码注释已经在 amend 里改成只讲约束；
+    - issue 草稿在 `flex_bwd_capture_order/ISSUE_DRAFT_2026-10-25.md`，等用户定。
+  - 第 5 条：README 和 `MiniMaxSparseAttention` 的 docstring 改成 "the index query and key projections and their norms"。
+    - amend 成 `9a5ab9ebe`，5D 三个提交 rebase 上去；
+    - 还没推，force-push 等用户点头。
+  - 第 6 条：新加 "Current scope"。
+    - Design 原来的 Parallelism 一条挪进 Current scope。
+    - 视频、compile、CUDA graph、MSA 的分块循环和 host 同步，都是对着代码核过的：
+      - `build_msa_metadata` 一次 `.tolist()`；
+      - `MSAIndexerLoss.forward` 每层一次 `nonzero().tolist()`，每个 tile 一次 `torch.tensor(..., device=)`；
+      - recipe 里 `disable_cuda_graphs=True`。
+  - 第 2 条：Test plan 的 CPU 一行换成全量 `pytest tests/unit_tests/cpu`，和 main 逐个测试比过，只在分支上失败的是 0。
+    - 原来分开列的 M3 CPU、adapter、通用四个文件三行并进了这一行。
+  - Test plan 里每条的来源：
+    - GPU 单测（2 passed）：10-25 在 5060 上对 `9a5ab9ebe` 重跑；
+    - 集成格子 `minimax_m3_mm_fsdp`：10-24 在 A4000 上对 `de7806dae` 跑过，amend 只改了 README、docstring 和一行注释；
+    - 对拍：10-24 A4000；
+    - Pyrefly：10-25 和 main 逐条比过，67 条完全相同。
+  - **硬件，等用户定：**
+    - 冲突在哪：HSDP 表是本机 8 x RTX 5060 Ti 测的；memory 规则 `pr-numerics-on-h100-5060-smoke-only` 要求正文里的 loss / grad 表来自 H100，否则写 "Pending (H100)."。
+    - 现在的做法：按 goal 第 1 条（"写进基线正文"）写进了正文，表头标了硬件。M3 已有的对拍和 5D 的表也都是 A4000 测的。
+    - 用户要 Pending 的话：把第二张表和它下面五条换成 "Pending (H100)."，5060 结果只留在 logbook。
+  - 自查：
+    - 段落一行一段；
+    - 无 we/our/us、无破折号、纯 ASCII；
+    - Design 嵌套 bullet 且每条一行；
+    - 没有 changed-files 块、没有 Relation 段、没有 `#<...>`。
+- **10-24（A4000 会话）的记录：**
+  - 正文按 #4577 格式重写，排版照 `PR_K3_VIDEO/PR_BODY_K3_VIDEO_2026-10-15.md`。
+  - 对着代码核出来、改掉的错：
+    - KL loss 训练的是整个 indexer（`wq`、`wk` 和它们的两个 norm）。核对：单卡第 1 步第 1 层 indexer `q_norm` / `k_norm` 的梯度范数都是 1.8e-3。
     - PP 在基线里不是 `NotImplementedError`：`supports_pipeline_parallel = False` 让 `BaseModel.pipeline` 抛 `RuntimeError`；只有 TP、CP、EP 在 `MiniMaxM3Model.__init__` 里抛 `NotImplementedError`。
-    - GPU 第二个测试是 `test_training_injects_the_kl_gradient_into_the_indexer_only`：训练和 eval 的输出、q/k/v 梯度逐位相同，只有 index q/k 多出 KL 梯度。上一版写成 "the training forward against the eval forward"。CPU 测试的描述也按 10 个测试名改了（上一版把 GPU 测的 "KL 梯度只进 indexer" 算到了 CPU 上）。
-    - 对拍表移到 `## Results`，表下的说明拆成三条单行 bullet；Design 里用分号连着两件事的条目都拆开了。
-  - 复核（10-24 晚，`de7806da`）：
-    - 测试重跑：M3 CPU 16 passed、adapter `-k MiniMaxM3` 2 passed、通用 4 个文件 91 passed、M3 GPU 2 passed；集成格子 `minimax_m3_mm_fsdp` 之前在同一提交上跑过（passed，10 步）。
+    - GPU 第二个测试是 `test_training_injects_the_kl_gradient_into_the_indexer_only`。
+  - 复核：
     - 对拍重跑（bf16 默认）：333 个 token，像素 4.768e-7，选块 94.4%，路由 98.3%，末 token KL 8.4318e-6，全位置 KL 2.9207e-3，和表一致；其余三行来自 `PARITY_HF_2026-10-24.md`。
-    - 正文里点名的类和参数都在树里：`SparseIndexerLoss(AuxLoss)`（`deepseek_v4/compressor.py`）、`CosSinRoPE`、`index_block_size`、`VisionTransformerBlock`、`sparse_attention=False`、脚本的 `--dtype {bfloat16,float32}`、`--attn_backend {varlen,flex}`、`--force-hf-blocks`、`--force-hf-routing`。
-    - diff 审读（`git diff a48507a8 de7806da`，逐行）：新增注释都是一行的约束说明；多行 docstring 都是一句摘要加一段代码看不出的事实（-1 表示空槽、返回值、dense 模式、视频分段）；没有 logbook 路径，没有实验数字。
-  - 粘贴前要填：Summary 最后一条的 `#<P1>`、`#<P2>`、`#<P3>`，换成三个 prep PR 的编号（先开 prep PR）。
-  - 两点留给用户定（都不影响正文）：
-    - `MiniMaxSparseAttention` 的 docstring 写 "its KL loss trains only the index projections"，严格说两个 index norm 也在训，改成 "trains only the indexer" 更准。要改就得 amend `de7806da`，再把 5D 分支的三个提交 rebase 上去。
-    - 4025 上 shuhuayu 说过 "titan's gemm only supports bf16, so we can simply use bf16, no fp32"。表里保留了 fp32 两行，用来说明 bf16 的残差来自精度、不是语义；想贴合 4025 的口径，可以只留 bf16 两行和 Results 的前两条 bullet。
-  - 自查：段落一行一段、无 we/our/us、无破折号、纯 ASCII、Design 嵌套 bullet 且每条一行、没有 changed-files 块、没有 Relation 段。
-- 分支：`minimax_m3`（worktree `/workspace/wt_m3`，基于 upstream main `3ed5aa97`），10-24 已推到 fork（`origin/minimax_m3`），没有开 PR。
-- 提交顺序：`9172a00f` P1（OffsetRMSNorm 移到 common）、`64be0610` P2（partial RoPE 进 RoPE）、`69dda371` P3（DSV3 adapter seam）、`a48507a8` P1b（norm 类型放宽）、`de7806da` M3。
-- 发 PR 时按用户之前的决定拆开：P1 + P1b 一个 PR，P2 一个，P3 一个，M3 叠在三者之上。到时再从这几个 commit cherry-pick 出各自的分支（推送前给用户看 diff）。
-- 待办：三个 prep PR 的 Test plan 现在只写了 `passed`，通过数要在各自 cherry-pick 出来的分支上单独跑出来再填（在叠了 M3 的分支上跑，计数会混进 M3 的条目）。
+    - diff 审读（`git diff a48507a8 de7806da`，逐行）：新增注释都是一行的约束说明，没有 logbook 路径，没有实验数字。
+  - 4025 上 shuhuayu 说过 "titan's gemm only supports bf16, so we can simply use bf16, no fp32"。表里保留了 fp32 两行，用来说明 bf16 的残差来自精度、不是语义；想贴合 4025 的口径，可以只留 bf16 两行。
+- 分支：`minimax_m3`（worktree `/workspace/wt_m3`，基于 upstream main `3ed5aa976`）。
+  - fork 上还是 10-24 推的 `de7806dae`；本地 amend 后是 `9a5ab9ebe`，本地备份分支 `backup/minimax_m3_pre_20261025` = `de7806dae`。
+  - 提交顺序：
+    - `9172a00f1` P1（OffsetRMSNorm 移到 common）；
+    - `64be06102` P2（partial RoPE 进 RoPE）；
+    - `69dda3713` P3（DSV3 adapter seam）；
+    - `a48507a84` P1b（norm 类型放宽）；
+    - `9a5ab9ebe` M3。
 
 ---
 
@@ -37,7 +74,7 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
 - Add the CLIP-style vision tower with 3D RoPE in `torchtitan/models/minimax_m3/vision_encoder.py`, built on the common `VisionTransformerBlock`.
 - Add `MiniMaxM3StateDictAdapter` on `DeepSeekV3StateDictAdapter`'s per-expert conversion, and `scripts/checkpoint_conversion/numerical_tests_minimax_m3.py`, a parity test against HF `minimax_m3_vl`.
 - Add CPU and GPU tests, and a 4-GPU multimodal FSDP cell to the models suite.
-- Stacked on #<P1> (OffsetRMSNorm in `models/common`), #<P2> (partial RoPE in `RoPE`) and #<P3> (DeepSeek V3 adapter seams).
+- The first four commits prepare shared code; they are listed under "Changes outside `models/minimax_m3/`".
 
 ## Design
 - Block selection:
@@ -49,33 +86,35 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
 - Sparse attention:
   - The selection becomes a flex `BlockMask` over 128-token tiles.
   - Its `mask_mod` captures one `[T, G, S, 2]` tensor of key ranges.
-  - One capture is deliberate: flex backward autotuning binds two or more captured tensors in a different order than its kernel reads them.
 - Indexer loss:
   - The teacher is the main attention averaged over the query heads of a KV group, rebuilt from the flex LSE under `no_grad`.
   - The student is the softmax of the index scores over the same keys.
   - `MSAIndexerLoss` injects the KL gradient on the attention output.
   - The indexer input is detached, so the loss trains only the indexer (`wq`, `wk` and their norms).
-  - DeepSeek V4's `SparseIndexerLoss` distills a head-summed target over compressed slots that all heads share.
-  - MSA's target is per KV group over the tokens of the selected blocks, so the loss is a separate class.
+  - DeepSeek V4's `SparseIndexerLoss` distills a head-summed target over shared compressed slots; MSA's target is per KV group over the selected blocks' tokens, so the loss is a separate class.
 - Indexer warmup: `build_model_config(..., sparse_attention=False)` attends every causal key while the indexer keeps training.
 - Checkpoints:
   - The adapter supplies M3's key map and `CosSinRoPE` through the DeepSeek V3 seams.
   - It reshapes the `Conv3d` patch embedding to the encoder's `Linear`.
-- Parallelism:
-  - FSDP2 and HSDP.
-  - TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.
+
+## Changes outside `models/minimax_m3/`
+- `models/common/norm.py`: `OffsetRMSNorm` moves here unchanged from `qwen3_5/model.py`, and its GPU test to `tests/unit_tests/gpu/models/common`.
+- `models/common/rope.py`: `RoPE.forward` rotates the first `dim` channels of a wider query and key and passes the rest through, replacing Qwen3.5's `_partial_rope` and its `rotary_dim` field (a TODO there asked for this move).
+  - Qwen3.5 debug recipes, deterministic, 10 steps on one warmed compile cache: identical loss on every step before and after, dense on 1 GPU and MoE at dp_shard 2 x tp 2 x pp 2 on 8 GPUs.
+- `models/deepseek_v3/state_dict_adapter.py`: the HF key map comes from an overridable `_build_from_hf_map(model_config)` and the RoPE check from `hf_rope_config_cls`; DeepSeek V3, V4 and Kimi K2.7 keep both.
+- `models/common/decoder.py`, `attention/attention.py` and `config_utils.py`: `Decoder.Config.norm`, `GQAttention.Config.qk_norm` and `make_gqa_config(qk_norm=...)` accept `OffsetRMSNorm.Config`; only the field types change, and the eleven `bad-argument-type` ignores in Qwen3.5 and Qwen3.8 go away.
+- Tests and README: MiniMax M3 joins the shared CPU tests' model lists (`test_model_defaults_to_varlen` skips it, since MSA runs on flex), the adapter tests and the README's model table.
 
 ## Test plan
-- `pytest tests/unit_tests/cpu/models/minimax_m3 -q` (`16 passed`): block selection, the flex mask and the KL against dense references, dense mode, the flavors and their layer layout, and the M3 flavor's 427,040,140,160 checkpoint elements (the released count).
-- `pytest tests/unit_tests/cpu/models/test_state_dict_adapter.py -k MiniMaxM3 -q` (`2 passed`)
-- `pytest tests/unit_tests/cpu/models/test_build_model_config.py tests/unit_tests/cpu/models/common/test_transformer_block.py tests/unit_tests/cpu/config/test_freeze_moe_routing.py tests/unit_tests/cpu/models/common/test_optional_imports.py -q` (`91 passed`)
-- `pytest tests/unit_tests/gpu/models/minimax_m3 -q` (`2 passed`): compiled sparse flex attention against masked SDPA, and a training step whose output and q/k/v gradients are bitwise equal to an eval step's while the index queries and keys get the KL gradient.
+- `pytest tests/unit_tests/cpu` (`1930 passed, 18 skipped, 3 xfailed, 1 failed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
+  - The one failure, `test_loss.py::TestChunkedLossWrapper::test_lora_head_only_matches_cross_entropy` (NaN against NaN), fails the same way on main `3ed5aa976` with the same torch nightly, 2.16.0.dev20261024 (`1906 passed, 18 skipped, 3 xfailed, 1 failed`).
+- `pytest tests/unit_tests/gpu/models/minimax_m3 -q` (`2 passed`)
 - `python -m tests.integration_tests.run_tests <out> --test_suite models --test_name minimax_m3_mm_fsdp --ngpu 4` (`passed`, 10 steps)
-- `python -m scripts.checkpoint_conversion.numerical_tests_minimax_m3`, with `--force-hf-blocks --force-hf-routing` and with `--dtype float32 --attn_backend flex` (results below)
-- Scoped pre-commit checks, including formatting, lint, and Pyrefly on the changed files (`passed`; Pyrefly reports only errors that main already has in the touched test files)
+- `python -m scripts.checkpoint_conversion.numerical_tests_minimax_m3`, with `--force-hf-blocks --force-hf-routing` and with `--dtype float32 --attn_backend flex` (first table below)
+- Pre-commit on the changed files: every hook passes except Pyrefly, whose 67 errors are the same 67 that main reports.
 
 ## Results
-The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF through HF's checkpoint conversion, and runs one 333-token image and text prompt; "HF imposed" runs TorchTitan on HF's block and expert selections.
+The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF, and runs one 333-token image and text prompt; "HF imposed" runs TorchTitan on HF's block and expert selections.
 
 | dtype | selections | block selections match | expert choices match | last-token KL | all-position KL |
 |---|---|---|---|---|---|
@@ -87,11 +126,35 @@ The parity test reduces the released HF config to `debugmodel`, loads the TorchT
 - Pixels match to 4.8e-7.
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
+
+fsdp4 against HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) on 4 RTX 5060 Ti, both dp 4 and so on the same samples: debug model, text-only c4_test, seq 512, 4096 tokens per step, AdamW, seed 42, deterministic, one single-GPU seed checkpoint, one compile cache warmed by 10 steps of each layout.
+
+| layout | step 1 loss / grad norm | step 3 loss / grad norm | step 10 loss / grad norm |
+|---|---|---|---|
+| fsdp4 | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108353 | 3.8191481 / 1.4246109 |
+| fsdp4 again | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108353 | 3.8191481 / 1.4246109 |
+| HSDP 2 x 2 | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108351 | 3.8189876 / 1.4227569 |
+
+- fsdp4 run twice is identical on all 10 steps; HSDP matches it bitwise on steps 1 and 2, and parts at step 3 (grad norm) and step 4 (loss).
+- Every rank's per-micro-batch gradients entering FSDP's reduction are bitwise equal in the two layouts; fsdp4 sums the four ranks in one reduce-scatter, and HSDP sums pairs over dp_shard and then the two replicas, so the fp32 sums round differently.
+- Adding the captured gradients in each layout's order reproduces both runs' step-1 gradients bitwise; the runs differ in 42 of 159 parameters, by at most 5.3e-8 in relative L2 norm, with no sign flips.
+
+## Current scope
+- Parallelism: FSDP2 and HSDP; TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.
+- Inputs: text and images, packed or not; the vision tower splits videos into segments, but no test covers video yet.
+- Compile: the local compile regions (loss, fused activation, offset RMSNorm, partial RoPE, fp32 split) and flex attention; CUDA graphs stay off, since MSA syncs with the host inside the forward.
+- MSA's block selection and KL loss are PyTorch loops over 128-query tiles:
+  - one `.tolist()` per batch builds the tile metadata;
+  - each sparse layer's KL takes one `nonzero().tolist()` and one host-to-device index copy per query tile;
+  - fused selection and KL kernels are follow-up work.
+- Only debug recipes are registered, and the adapter does not load the released NVFP4 and MXFP8 M3.1-Flash weights.
 --- PASTE END ---
 
 ---
 
-## P1 + P1b PR
+以下三份是 10-24 准备单独开 prep PR 时写的正文。10-25 决定只开两个 PR，prep 提交留在基线里，这三份不再粘贴，只作为上面 "Changes outside" 的出处。
+
+## P1 + P1b PR（不再使用）
 
 标题：`[models] move OffsetRMSNorm to models/common and accept it where RMSNorm configs are taken`
 
@@ -109,9 +172,7 @@ Move `OffsetRMSNorm` (the float32 `(1 + weight) * norm(x)` RMSNorm) from `qwen3_
 - Scoped pre-commit checks, including formatting, lint, and Pyrefly (`passed`)
 --- PASTE END ---
 
----
-
-## P2 PR
+## P2 PR（不再使用）
 
 标题：`[rope] rotate the first dim channels of wider inputs`
 
@@ -127,9 +188,7 @@ Move `OffsetRMSNorm` (the float32 `(1 + weight) * norm(x)` RMSNorm) from `qwen3_
 - Scoped pre-commit checks, including formatting, lint, and Pyrefly (`passed`)
 --- PASTE END ---
 
----
-
-## P3 PR
+## P3 PR（不再使用）
 
 标题：`[deepseek_v3] let state dict adapter subclasses supply the key map and RoPE type`
 
