@@ -13,9 +13,9 @@ run() {  # <name> <gpus> <M3_CELL>
       timeout 2400 torchrun --nproc_per_node=$n --rdzv_backend c10d --rdzv_endpoint=localhost:0 --role rank --tee 3 \
       $K/step1_probe.py --module m3_text18_probe --config cell --output-dir $D/out > $D/run.log 2>&1 < /dev/null )
   local rc=$?; rm -rf $D/out $D/tmp
-  note "static $name rc=$rc limit=$(grep -a -c m3_static_probe $D/run.log) shim=$(grep -a -c m3_5060_shim $D/run.log) seed_loaded=$(grep -a -c 'Loading the checkpoint' $D/run.log) step1=[$(cat $D/loss_rank*.txt | awk '$2 >= 0' | sort -u | tr '\n' ' ')]"
+  note "static $name rc=$rc limit=$(grep -a -c "flex recompiled" $D/run.log) shim=$(grep -a -c m3_5060_shim $D/run.log) seed_loaded=$(grep -a -c 'Loading the checkpoint' $D/run.log) step1=[$(cat $D/loss_rank*.txt | awk '$2 >= 0' | sort -u | tr '\n' ' ')]"
 }
-note "# static-shape check, retry with recompile_limit 256"
+note "# static-shape check, retry with every compile at limit 256"
 run tp2_ep2 0,1 "tp=2,ep=2"
 run tp2_ep2_pp2 0,1,2,3 "tp=2,ep=2,pp=2"
 rm -rf $C

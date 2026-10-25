@@ -11,3 +11,15 @@
 09:48:45 static tp2_ep2 rc=1 limit=2 shim=2 seed_loaded=2 step1=[]
 09:49:29 static tp2_ep2_pp2 rc=1 limit=4 shim=4 seed_loaded=4 step1=[]
 09:49:30 STATIC_DONE
+15:37:13 # static-shape check, retry with flex recompiled at limit 256
+15:38:01 static tp2_ep2 rc=1 limit=2 shim=2 seed_loaded=2 step1=[]
+15:38:46 static tp2_ep2_pp2 rc=1 limit=4 shim=4 seed_loaded=4 step1=[]
+15:38:47 STATIC_DONE
+15:39:54 # static-shape check, retry with every compile at limit 256
+15:41:17 static tp2_ep2 rc=0 limit=2 shim=2 seed_loaded=2 step1=[1 8.010704040527344 1.648267388343811 ]
+15:42:11 static tp2_ep2_pp2 rc=0 limit=4 shim=4 seed_loaded=4 step1=[1 8.010703086853027 1.6482688188552856 ]
+15:42:11 STATIC_DONE
+15:43:48 # per-micro-batch losses for the tp2 x ep2 PP 1-ulp gap
+15:44:22 mbloss tp2_ep2 rc=0 armed=2 files=[mb_losses_rank0.txt mb_losses_rank1.txt ] step1=[1 8.010704040527344 1.6482678651809692 ]
+15:45:01 mbloss tp2_ep2_pp2 rc=0 armed=4 files=[mb_losses_rank2.txt mb_losses_rank3.txt ] step1=[1 8.010703086853027 1.6482688188552856 ]
+15:45:01 MBLOSS_DONE

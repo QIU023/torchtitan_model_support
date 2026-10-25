@@ -303,7 +303,27 @@ if os.environ.get("M3_STATIC_SHAPES") == "1":
     if os.environ.get("M3_RECOMPILE_LIMIT"):
         torch._dynamo.config.recompile_limit = int(os.environ["M3_RECOMPILE_LIMIT"])
         torch._dynamo.config.accumulated_recompile_limit = 16 * int(os.environ["M3_RECOMPILE_LIMIT"])
-        sys.stderr.write(f"m3_static_probe: rank {RANK} recompile_limit {torch._dynamo.config.recompile_limit}\n")
+        _limit = int(os.environ["M3_RECOMPILE_LIMIT"])
+        _orig_torch_compile = torch.compile
+
+        def _compile_with_limit(*args, **kwargs):
+            # Local compile regions pass their own recompile_limit; static shapes need more graphs.
+            if "recompile_limit" in kwargs:
+                kwargs["recompile_limit"] = max(kwargs["recompile_limit"], _limit)
+            return _orig_torch_compile(*args, **kwargs)
+
+        torch.compile = _compile_with_limit
+        from torch.nn.attention.flex_attention import flex_attention as _flex_attention
+        from torchtitan.models.common.attention.attention import FlexInnerAttention as _FlexInner
+
+        # Same compile as titan's class attribute, with only the per-function recompile limit raised.
+        _FlexInner._compiled_flex_attn = torch.compile(
+            _flex_attention,
+            fullgraph=True,
+            options=_FlexInner.inductor_configs,
+            recompile_limit=int(os.environ["M3_RECOMPILE_LIMIT"]),
+        )
+        sys.stderr.write(f"m3_static_probe: rank {RANK} recompile_limit {torch._dynamo.config.recompile_limit}, flex recompiled\n")
 
 _routes: list = []
 if os.environ.get("M3_HOOK_ROUTE_ALL") == "1" or os.environ.get("M3_FORCE_ROUTE"):
@@ -330,6 +350,46 @@ if os.environ.get("M3_HOOK_ROUTE_ALL") == "1" or os.environ.get("M3_FORCE_ROUTE"
         return ref.to(device=ids.device, dtype=ids.dtype)
 
     _moe_mod.TokenChoiceTopKRouter._select_experts = _select_experts
+
+if os.environ.get("M3_DUMP_MB_LOSSES") == "1":
+    import torchtitan.training_engine as _te
+
+    _mb_losses: list = []
+    _orig_non_pp = _te.TrainingEngine._non_pp_forward_backward_microbatch
+    _orig_pp_group = _te.TrainingEngine._pp_forward_backward_microbatch_group
+
+    def _non_pp(self, *args, **kwargs):
+        loss = _orig_non_pp(self, *args, **kwargs)
+        _mb_losses.append(loss.detach().clone())
+        return loss
+
+    def _pp_group(self, *args, **kwargs):
+        orig_step = self.pp_schedule.step
+
+        def step(*a, **kw):
+            out = orig_step(*a, **kw)
+            if kw.get("losses") is not None:
+                _mb_losses.extend(loss.detach().clone() for loss in kw["losses"])
+            return out
+
+        self.pp_schedule.step = step
+        try:
+            return _orig_pp_group(self, *args, **kwargs)
+        finally:
+            del self.pp_schedule.step
+
+    _te.TrainingEngine._non_pp_forward_backward_microbatch = _non_pp
+    _te.TrainingEngine._pp_forward_backward_microbatch_group = _pp_group
+    _orig_clip_mb = optim_mod.dist_utils.clip_grad_norm_
+
+    def _clip_mb(*args, **kwargs):
+        if _mb_losses and not os.path.exists(os.path.join(OUT, f"mb_losses_rank{RANK}.txt")):
+            with open(os.path.join(OUT, f"mb_losses_rank{RANK}.txt"), "w") as f:
+                f.write("\n".join(repr(float(t)) for t in _mb_losses) + "\n")
+        return _orig_clip_mb(*args, **kwargs)
+
+    optim_mod.dist_utils.clip_grad_norm_ = _clip_mb
+    sys.stderr.write(f"m3_mb_loss_probe: rank {RANK} armed\n")
 
 sys.argv = ["torchtitan.train"] + sys.argv[1:]
 runpy.run_module("torchtitan.train", run_name="__main__")

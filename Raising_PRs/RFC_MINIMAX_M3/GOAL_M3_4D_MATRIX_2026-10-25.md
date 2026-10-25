@@ -60,7 +60,8 @@ MiniMax M3 的 4D 并行矩阵在本机（8 x RTX 5060 Ti）补全，写回 logb
 - **判断：**
   - 只差 FSDP、HSDP、PP 的格子，第 1 步 loss 全部逐位；只开 EP 不开 TP 的格子也全部逐位，而且 EP 只改变 routed experts 的梯度。
   - TP 的差，用强制单卡的选块和路由在本机复现了 10-24 的归因：tp2 x ep2 从 2.79e-2 降到 5.39e-3，tp4 x ep4 从 3.93e-2 降到 5.73e-3。
-  - 一处没有定位：tp2 x ep2 x pp2 / pp4 和 tp2 x ep2 之间差 1 个 fp32 单位。这是两个 TP 格子之间的差，不进正文；用 static shapes 复查时撞到了 flex 自己的 `recompile_limit=16`。
+  - tp2 x ep2 x pp2 / pp4 和 tp2 x ep2 之间那 1 个 fp32 单位已经定位：8 个 micro-batch 的 loss 逐位相同，差别只在 engine 汇总它们的方式（PP 用 `torch.sum(torch.stack(...))`，非 PP 逐个 `add_`），两种加法分别重算出两边记录的值。titan main 的行为，不进正文。
+  - 矩阵里没有未定位的差距。
 - **写回：**
   - 5D 正文 Test plan 最后一条换成覆盖情况，表写 Pending (H100)；
   - 基线正文没动；
