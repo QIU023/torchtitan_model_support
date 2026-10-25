@@ -9,13 +9,14 @@
     - 最后一条是 M3 提交本身在共享测试和 README 里的登记。
     - Summary 里的 `#<P1>` / `#<P2>` / `#<P3>` 换成一句"前四个提交是共享代码的准备"。
     - 下面三份 prep 正文不再使用，留作出处。
-  - 第 1 条 HSDP：Results 加了第二张表和五条说明，细节和定位见 `CHECKS_2026-10-25.md`。
+  - 第 1 条 HSDP：本机 5060 上测完并定位，细节见 `CHECKS_2026-10-25.md`。
     - 第 1、2 步 loss 和 grad norm 都逐位；
     - fsdp4 跑两次，10 步全同；
     - 差异定位到 FSDP 规约的求和顺序，两边的第 1 步梯度都能从截获的规约输入逐位重建。
+    - 正文 Results 里只写一行 "Pending (H100)."（用户 10-25 选的）：照 memory 规则，正文的 loss / grad 表要 H100 的数；5060 的表和定位留在 logbook。H100 上要跑的就是 `CHECKS_2026-10-25.md` 里这组（`kit_m3_5060_2026-10-25/run_hsdp.sh`，FA shim 在 H100 上不需要）。
   - 第 4 条：Design 里 "One capture is deliberate: flex backward autotuning binds ..." 那条删了，只留 "Its `mask_mod` captures one `[T, G, S, 2]` tensor of key ranges."。
     - 代码注释已经在 amend 里改成只讲约束；
-    - issue 草稿在 `flex_bwd_capture_order/ISSUE_DRAFT_2026-10-25.md`，等用户定。
+    - issue 草稿在 `flex_bwd_capture_order/ISSUE_DRAFT_2026-10-25.md`；用户 10-25 定为不发，正文和注释保持只讲约束。
   - 第 5 条：README 和 `MiniMaxSparseAttention` 的 docstring 改成 "the index query and key projections and their norms"。
     - amend 成 `9a5ab9ebe`，5D 三个提交 rebase 上去；
     - 还没推，force-push 等用户点头。
@@ -32,10 +33,7 @@
     - 集成格子 `minimax_m3_mm_fsdp`：10-24 在 A4000 上对 `de7806dae` 跑过，amend 只改了 README、docstring 和一行注释；
     - 对拍：10-24 A4000；
     - Pyrefly：10-25 和 main 逐条比过，67 条完全相同。
-  - **硬件，等用户定：**
-    - 冲突在哪：HSDP 表是本机 8 x RTX 5060 Ti 测的；memory 规则 `pr-numerics-on-h100-5060-smoke-only` 要求正文里的 loss / grad 表来自 H100，否则写 "Pending (H100)."。
-    - 现在的做法：按 goal 第 1 条（"写进基线正文"）写进了正文，表头标了硬件。M3 已有的对拍和 5D 的表也都是 A4000 测的。
-    - 用户要 Pending 的话：把第二张表和它下面五条换成 "Pending (H100)."，5060 结果只留在 logbook。
+  - 硬件：用户 10-25 定为 Pending (H100)（见上）。M3 已有的对拍表（A4000，对的是 HF，不是 titan main）和 5D 的表（A4000）这次没有动。
   - 自查：
     - 段落一行一段；
     - 无 we/our/us、无破折号、纯 ASCII；
@@ -127,17 +125,7 @@ The parity test reduces the released HF config to `debugmodel`, loads the TorchT
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
 
-fsdp4 against HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) on 4 RTX 5060 Ti, both dp 4 and so on the same samples: debug model, text-only c4_test, seq 512, 4096 tokens per step, AdamW, seed 42, deterministic, one single-GPU seed checkpoint, one compile cache warmed by 10 steps of each layout.
-
-| layout | step 1 loss / grad norm | step 3 loss / grad norm | step 10 loss / grad norm |
-|---|---|---|---|
-| fsdp4 | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108353 | 3.8191481 / 1.4246109 |
-| fsdp4 again | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108353 | 3.8191481 / 1.4246109 |
-| HSDP 2 x 2 | 8.0326929 / 1.7898140 | 6.3080544 / 2.1108351 | 3.8189876 / 1.4227569 |
-
-- fsdp4 run twice is identical on all 10 steps; HSDP matches it bitwise on steps 1 and 2, and parts at step 3 (grad norm) and step 4 (loss).
-- Every rank's per-micro-batch gradients entering FSDP's reduction are bitwise equal in the two layouts; fsdp4 sums the four ranks in one reduce-scatter, and HSDP sums pairs over dp_shard and then the two replicas, so the fp32 sums round differently.
-- Adding the captured gradients in each layout's order reproduces both runs' step-1 gradients bitwise; the runs differ in 42 of 159 parameters, by at most 5.3e-8 in relative L2 norm, with no sign flips.
+fsdp4 against HSDP 2 x 2 (dp_replicate 2 x dp_shard 2), both dp 4 and so on the same samples: Pending (H100).
 
 ## Current scope
 - Parallelism: FSDP2 and HSDP; TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.

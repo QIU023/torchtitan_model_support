@@ -123,8 +123,10 @@ titan 的提交和正文不带 Claude 署名；发 issue、开 PR、force-push �
 6. **Current scope：完成。**
    - 包括并行、视频、compile 和 CUDA graph、MSA 的分块循环和三处 host 同步、只有 debug recipe。
 
-**等用户定：**
-- force-push 两个分支（备份在同一条 `&&` 链里先推）；
-- 发不发 PyTorch issue；
-- HSDP 表用 5060 的数还是写 Pending (H100)；
-- `lm_head` 在 HSDP 下每个 micro-batch 都 all-reduce 的附带发现，要不要报给 titan。
+**用户 10-25 的决定：**
+- force-push：同意。等这台机器的 SSH key 在 GitHub 生效，按 `CHECKS_2026-10-25.md` 末尾那条 `&&` 链执行（先推两个 backup，再 force-with-lease）。
+- PyTorch issue：不发；第 4 条走"只讲约束"那一支，已经完成。
+- HSDP 表：正文改成 "Pending (H100)."；5060 的表和定位留在 `CHECKS_2026-10-25.md`。
+- `lm_head` 的附带发现：只记在 logbook。
+
+**还差的一步：** force-push（以及 logbook 推送），只等 SSH。
