@@ -2,6 +2,10 @@
 
 ## 状态（不粘贴）
 
+- **10-25 晚 4D 矩阵（`GOAL_M3_4D_MATRIX_2026-10-25.md`）：** 正文没动。
+  - dp4 这条数据流在 5D 树上用 20 步重跑了 fsdp4（两次）和 HSDP 2 x 2：第 1 步 loss 和 grad norm 都逐位，第 1 步梯度的特征和白天定位的一样（117/159 逐位，最大 5.27e-8）。
+  - 其余 HSDP 组合也全部跑通：ep2 x HSDP 2 x 2、HSDP 2 x 2 x pp2、HSDP 2 x 2 x tp2 x ep2、HSDP 2 x 4、HSDP 4 x 2、ep4 x HSDP 2 x 4。所以 README 和正文里的 HSDP 保留。
+  - goal 原文要给这份正文加一张 dp4 的表，但用户 10-25 定了正文里写 "Pending (H100)."，所以没加。可以直接贴的 dp4 表（fsdp4、fsdp4 again、HSDP 2 x 2 等）在 `M3_4D_TABLES_EN_2026-10-25.md`。
 - **10-25（goal：两个 PR 达到 #4025 的合入标准，见 `GOAL_PR_READY_2026-10-25.md`；5060 会话）：**
   - 只开两个 PR：四个 prep 提交留在基线里。
     - 正文照 #4025 加了 "Changes outside `models/minimax_m3/`"，每个 prep 提交一条，内容取自下面三份旧 prep 正文；

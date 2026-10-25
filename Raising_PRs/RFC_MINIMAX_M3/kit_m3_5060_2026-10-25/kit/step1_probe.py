@@ -300,6 +300,10 @@ if os.environ.get("M3_STATIC_SHAPES") == "1":
     import torch._dynamo
 
     torch._dynamo.config.automatic_dynamic_shapes = False
+    if os.environ.get("M3_RECOMPILE_LIMIT"):
+        torch._dynamo.config.recompile_limit = int(os.environ["M3_RECOMPILE_LIMIT"])
+        torch._dynamo.config.accumulated_recompile_limit = 16 * int(os.environ["M3_RECOMPILE_LIMIT"])
+        sys.stderr.write(f"m3_static_probe: rank {RANK} recompile_limit {torch._dynamo.config.recompile_limit}\n")
 
 _routes: list = []
 if os.environ.get("M3_HOOK_ROUTE_ALL") == "1" or os.environ.get("M3_FORCE_ROUTE"):

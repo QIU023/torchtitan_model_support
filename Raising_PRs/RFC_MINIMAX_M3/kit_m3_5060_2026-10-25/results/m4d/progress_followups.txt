@@ -1,0 +1,13 @@
+09:41:43 # TP forced selections and routing
+09:42:13 tpforce dp1_record rc=0 shim=1 seed_loaded=1 files=[blocks.pt grads.pt loss_rank0.txt routes_all.pt selections_all.pt ] step1=[1 8.010587692260742 1.6482834815979004]
+09:42:49 tpforce tp2_ep2_forced rc=0 shim=2 seed_loaded=2 files=[blocks.pt grads.pt loss_rank0.txt loss_rank1.txt ] step1=[1 8.010710716247559 1.6482455730438232]
+09:42:50 tpforce tp4_ep4_forced rc=0 shim=4 seed_loaded=4 files=[blocks.pt grads.pt loss_rank0.txt loss_rank1.txt loss_rank2.txt loss_rank3.txt ] step1=[1 8.010692596435547 1.6482521295547485]
+09:42:50 TPFORCE_DONE
+09:45:32 # static-shape check for the tp2 x ep2 PP 1-ulp gap
+09:46:21 static tp2_ep2 rc=1 shim=2 seed_loaded=2 step1=[]
+09:47:07 static tp2_ep2_pp2 rc=1 shim=4 seed_loaded=4 step1=[]
+09:47:07 STATIC_DONE
+09:47:57 # static-shape check, retry with recompile_limit 256
+09:48:45 static tp2_ep2 rc=1 limit=2 shim=2 seed_loaded=2 step1=[]
+09:49:29 static tp2_ep2_pp2 rc=1 limit=4 shim=4 seed_loaded=4 step1=[]
+09:49:30 STATIC_DONE
