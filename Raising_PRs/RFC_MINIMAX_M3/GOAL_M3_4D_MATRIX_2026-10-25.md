@@ -66,3 +66,9 @@ MiniMax M3 的 4D 并行矩阵在本机（8 x RTX 5060 Ti）补全，写回 logb
   - 基线正文没动；
   - 可以直接贴的英文表在 `M3_4D_TABLES_EN_2026-10-25.md`。
 - CPU 全量白天已经完成，今晚没有改代码，不重跑。
+
+**用户 10-25 晚再次确认（goal 原文和之前的决定冲突时问的）：**
+- 基线正文的 dp4 结果保持 "Pending (H100)."；
+- 5D draft 的 Test plan 最后一条保持覆盖情况加 "Loss and grad norm tables: Pending (H100)."。
+- 正文都不贴 5060 的表；四张表和 dp4 表只留在 `M3_4D_TABLES_EN_2026-10-25.md` 和 `M3_5D_2026-10-24.md`。
+- 这个 goal 就此完成。
