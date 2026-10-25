@@ -2,6 +2,15 @@
 
 背景见 `REVIEW_M3_PRS_2026-10-25.md`。用户的顺序：5D 整个分支先开 draft 占位，这个矩阵跑完再开 FSDP2 基线。下面是要叠加到你手上工作里的部分。
 
+**10-25 5060 会话的说明（prompt 本身没改）：**
+- 现在的 GPU 机器是 8 x RTX 5060 Ti，A4000 那台已经换掉。
+- 分支已按用户同意 force-push：`minimax_m3_5d` = `89fc094d1`。代码和 `798f8817f` 相同，只差 README、docstring 和一行注释的文字；旧 head 在 fork 的 `backup/minimax_m3_5d_pre_20261025`。
+- 下面这几项已经在 5060 上做完（`CHECKS_2026-10-25.md`，kit `kit_m3_5060_2026-10-25/`）：
+  - probe 的 `dpr` 键和 micro-batch 数；
+  - dp4 的 fsdp4、HSDP 2 x 2 和 noise floor：第 1、2 步逐位，差异定位到 FSDP 规约的求和顺序；
+  - 三棵树的 CPU 全量：只在分支上失败的是 0。
+- 用户 10-25 定：基线正文的 HSDP 结果写 "Pending (H100)."。所以"写回"那条里基线的 dp4 表，换了机器也不贴 5060 的数。
+
 --- PROMPT BEGIN ---
 
 在 8 x A4000 上把 MiniMax M3 的 4D 并行矩阵补全，CP 不跑。

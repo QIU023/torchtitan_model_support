@@ -129,4 +129,8 @@ titan 的提交和正文不带 Claude 署名；发 issue、开 PR、force-push �
 - HSDP 表：正文改成 "Pending (H100)."；5060 的表和定位留在 `CHECKS_2026-10-25.md`。
 - `lm_head` 的附带发现：只记在 logbook。
 
-**还差的一步：** force-push（以及 logbook 推送），只等 SSH。
+- 另一个会话（CPU）记的用户顺序（`GPU_PROMPT_M3_4D_MATRIX_2026-10-25.md`）：
+  - 先开 5D 的 draft 占位，等完整并行矩阵跑完再开 FSDP2 基线；
+  - 5D 正文已由 CPU 会话改成短的占位版，本会话只把 Test plan 第一条换成 CPU 全量。
+
+**force-push 已完成（10-25）：** `minimax_m3` = `9a5ab9ebe`，`minimax_m3_5d` = `89fc094d1`，旧 head 在 fork 的两个 `backup/..._pre_20261025` 分支。

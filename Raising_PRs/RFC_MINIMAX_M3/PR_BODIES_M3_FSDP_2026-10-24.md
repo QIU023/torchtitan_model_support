@@ -19,7 +19,7 @@
     - issue 草稿在 `flex_bwd_capture_order/ISSUE_DRAFT_2026-10-25.md`；用户 10-25 定为不发，正文和注释保持只讲约束。
   - 第 5 条：README 和 `MiniMaxSparseAttention` 的 docstring 改成 "the index query and key projections and their norms"。
     - amend 成 `9a5ab9ebe`，5D 三个提交 rebase 上去；
-    - 还没推，force-push 等用户点头。
+    - 用户 10-25 同意后已 force-push，旧 head 先推成了 fork 上的 backup 分支（见 `CHECKS_2026-10-25.md` 第 5 条）。
   - 第 6 条：新加 "Current scope"。
     - Design 原来的 Parallelism 一条挪进 Current scope。
     - 视频、compile、CUDA graph、MSA 的分块循环和 host 同步，都是对着代码核过的：
@@ -50,7 +50,7 @@
     - diff 审读（`git diff a48507a8 de7806da`，逐行）：新增注释都是一行的约束说明，没有 logbook 路径，没有实验数字。
   - 4025 上 shuhuayu 说过 "titan's gemm only supports bf16, so we can simply use bf16, no fp32"。表里保留了 fp32 两行，用来说明 bf16 的残差来自精度、不是语义；想贴合 4025 的口径，可以只留 bf16 两行。
 - 分支：`minimax_m3`（worktree `/workspace/wt_m3`，基于 upstream main `3ed5aa976`）。
-  - fork 上还是 10-24 推的 `de7806dae`；本地 amend 后是 `9a5ab9ebe`，本地备份分支 `backup/minimax_m3_pre_20261025` = `de7806dae`。
+  - fork 上现在是 `9a5ab9ebe`（10-25 force-push）；10-24 的 `de7806dae` 在 fork 的 `backup/minimax_m3_pre_20261025`。
   - 提交顺序：
     - `9172a00f1` P1（OffsetRMSNorm 移到 common）；
     - `64be06102` P2（partial RoPE 进 RoPE）；
