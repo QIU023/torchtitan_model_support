@@ -2,7 +2,19 @@
 
 ## 状态（不粘贴）
 
-- **10-26 H200（`root@217.18.55.94`，4 x H200，driver 595 / CUDA 13.2，torch 2.16.0.dev20261024+cu130，和 5060 同一个 build）：**
+- **10-26 H100（`root@87.116.91.146 -p 11468`，4 x H100 NVL 95 GB，driver 595.91 / CUDA 13.2，torch 2.16.0.dev20261024+cu130）：正文里每个数字现在都来自这台机器。**
+  - 用户："本机重新改写2个body，FSDP2基线和4D body，不需要出现H200之外的数据"。H200 释放后改成："FSDP2里面的表重新来一遍"，以及"4D全部数值只用5060，FSDP2基线现在去跑"。
+  - kit 在 `kit_m3_5060_2026-10-25/h100/`（README 里写了运行顺序），结果在 `results_h100/runs/`；正文链接钉在 logbook 提交 `b8492e78`。
+  - 每一项的来源（全部是 H100）：
+    - dp4 表：`hsdp_s100/table_4312.md`，和 H200 那份逐字节相同。三个格子的 loss 文件各 100 行全同，第 1 步梯度的两份对比也逐字节相同。所以表里的数一个没变，只改了硬件和 kit 链接。
+    - 规约重建：`hsdp_s100/rebuild/reduce_emulate.txt`。规约输入 1272/1272 逐位相同；按 HSDP 的树和按 ring (0,1,2,3) 重算，各自 159/159 逐位复现第 1 步梯度；其余 5 种 ring 顺序都对不上。正文去掉了 "measured on 8 x RTX 5060 Ti"。
+    - 对拍表：`parity/*.txt`，四行全部换成 H100 的数。bf16 不强制选择那行的选块一致率是 93.8%（A4000 是 94.4%），差别来自近似平局在不同硬件上翻向不同的一边。
+    - "fp32 下每个模块都和 HF 一致到舍入误差"：`parity_diag/` 的 7 个探针在 H100 上重跑，结论和 10-24 在 A4000 上的一致。强制选择后，attn0 7.5e-7、ffn0 1.8e-6、attn1 6.4e-7、ffn1 4.9e-3；用 titan 自己的参数按 fp32 算 routed experts，对 HF 是 1.7e-7。
+    - CPU 全量：基线单独跑 1931 passed / 18 skipped / 3 xfailed，main 是 1907 passed，只在分支上失败的是 0。第一遍和 main 同时跑，8 个 `test_parallelism_context` 测试抢写死的 12356 端口失败了，已单独重跑。5060 上两边都失败的那个 NaN 测试，在这台机器上两边都通过，所以正文删掉了那条说明。
+    - GPU 单测 2 passed；集成格子 `minimax_m3_mm_fsdp` 跑满 10 步，rc=0，loss 从 8.106 降到 4.021。
+    - pre-commit：Pyrefly 在基线和 main 上都是 0 errors。hook 失败只是因为 `--remove-unused-ignores` 删掉了 `video.py` 里 `import av` 的 ignore（这台的 venv 装了 PyAV），main 上一模一样（`precommit/pyrefly_probe_*.diff`）。5060 上的 67 条是那台 venv 的环境造成的，两台的 pyrefly 都是 0.45.1。
+    - P2：dense 用 1 卡，MoE 用 4 卡（tp 2 x pp 2 x ep 2，`h100/p2cfg/`）；main、基线、main 再跑一次，`--assert-equal` 全部通过。正文 Changes outside 里 MoE 的配置改成了这个。
+- **10-26 H200（已被上面的 H100 取代，正文不再引用；`root@217.18.55.94`，4 x H200，driver 595 / CUDA 13.2，torch 2.16.0.dev20261024+cu130，和 5060 同一个 build）：**
   - 用户："如果work的话最后body写h200"；"我们就100步，c4，按照我的4312来"。
   - 协议：
     - `c4_test`（2000 篇、369 万 token，100 步只读 11%，不会重复读）；
@@ -114,34 +126,33 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
 ## Changes outside `models/minimax_m3/`
 - `models/common/norm.py`: `OffsetRMSNorm` moves here unchanged from `qwen3_5/model.py`, and its GPU test to `tests/unit_tests/gpu/models/common`.
 - `models/common/rope.py`: `RoPE.forward` rotates the first `dim` channels of a wider query and key and passes the rest through, replacing Qwen3.5's `_partial_rope` and its `rotary_dim` field (a TODO there asked for this move).
-  - Qwen3.5 debug recipes, deterministic, 10 steps on one warmed compile cache: identical loss on every step before and after, dense on 1 GPU and MoE at dp_shard 2 x tp 2 x pp 2 on 8 GPUs.
+  - Qwen3.5 debug recipes, deterministic, 10 steps on one warmed compile cache: identical loss on every step before and after, dense on 1 GPU and MoE at tp 2 x pp 2 x ep 2 on 4 GPUs.
 - `models/deepseek_v3/state_dict_adapter.py`: the HF key map comes from an overridable `_build_from_hf_map(model_config)` and the RoPE check from `hf_rope_config_cls`; DeepSeek V3, V4 and Kimi K2.7 keep both.
 - `models/common/decoder.py`, `attention/attention.py` and `config_utils.py`: `Decoder.Config.norm`, `GQAttention.Config.qk_norm` and `make_gqa_config(qk_norm=...)` accept `OffsetRMSNorm.Config`; only the field types change, and the eleven `bad-argument-type` ignores in Qwen3.5 and Qwen3.8 go away.
 - Tests and README: MiniMax M3 joins the shared CPU tests' model lists (`test_model_defaults_to_varlen` skips it, since MSA runs on flex), the adapter tests and the README's model table.
 
 ## Test plan
-- `pytest tests/unit_tests/cpu` (`1930 passed, 18 skipped, 3 xfailed, 1 failed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
-  - The one failure, `test_loss.py::TestChunkedLossWrapper::test_lora_head_only_matches_cross_entropy` (NaN against NaN), fails the same way on main `3ed5aa976` with the same torch nightly, 2.16.0.dev20261024 (`1906 passed, 18 skipped, 3 xfailed, 1 failed`).
+- `pytest tests/unit_tests/cpu` (`1931 passed, 18 skipped, 3 xfailed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
 - `pytest tests/unit_tests/gpu/models/minimax_m3 -q` (`2 passed`)
 - `python -m tests.integration_tests.run_tests <out> --test_suite models --test_name minimax_m3_mm_fsdp --ngpu 4` (`passed`, 10 steps)
 - `python -m scripts.checkpoint_conversion.numerical_tests_minimax_m3`, with `--force-hf-blocks --force-hf-routing` and with `--dtype float32 --attn_backend flex` (first table below)
-- Pre-commit on the changed files: every hook passes except Pyrefly, whose 67 errors are the same 67 that main reports.
+- Pre-commit on the changed files: every hook passes except Pyrefly, which reports 0 errors and, as on main, only removes the unused `missing-import` ignore on `import av` in `components/data/multimodal/utils/video.py`.
 
 ## Results
-The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF, and runs one 333-token image and text prompt; "HF imposed" runs TorchTitan on HF's block and expert selections.
+The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF, and runs one 333-token image and text prompt on one H100 NVL; "HF imposed" runs TorchTitan on HF's block and expert selections.
 
 | dtype | selections | block selections match | expert choices match | last-token KL | all-position KL |
 |---|---|---|---|---|---|
-| bf16 | free | 94.4% | 98.3% | 8.43e-6 | 2.92e-3 |
-| bf16 | HF imposed | 100% | 100% | 8.50e-6 | 4.10e-5 |
-| fp32 | free | 98.8% | 99.6% | -7.2e-7 | 4.69e-4 |
-| fp32 | HF imposed | 100% | 100% | -2.0e-7 | 2.12e-6 |
+| bf16 | free | 93.8% | 97.9% | 1.50e-5 | 3.61e-3 |
+| bf16 | HF imposed | 100% | 100% | 8.26e-6 | 4.07e-5 |
+| fp32 | free | 98.9% | 99.6% | -9.8e-7 | 4.68e-4 |
+| fp32 | HF imposed | 100% | 100% | -1.9e-7 | 2.13e-6 |
 
 - Pixels match to 4.8e-7.
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
 
-4 x H200, debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps; every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed. fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor. Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8dea79470f5/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h200/run_hsdp_h100.sh).
+4 x H100 NVL, debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps; every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed. fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor. Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h100/run_hsdp_h100.sh).
 
 HSDP matches FSDP bitwise through step 3 and parts from the grad norm at step 4, because its reduction adds the ranks' gradients in a different order.
 
@@ -152,7 +163,7 @@ HSDP matches FSDP bitwise through step 3 and parts from the grad norm at step 4,
 | HSDP 2 x 2 | `8.032684`<br>identical | `3.494834`<br>-0.06% | `3.005924`<br>-0.04% | `2.682940`<br>+0.00% | `1.7898`<br>identical | `1.0071`<br>-1.27% | `0.6005`<br>-3.43% | `0.4254`<br>+0.86% |
 
 - The step-1 gradients differ in 33 of 159 parameters, by at most 5.2e-8 in relative L2 norm, with no sign flips.
-- fsdp4 sums the four ranks in one reduce-scatter, while HSDP sums pairs over dp_shard and then the two replicas; re-adding the gradients captured at FSDP's reduction in each order reproduces both layouts' step-1 gradients bitwise ([CHECKS_2026-10-25.md](https://github.com/QIU023/torchtitan_model_support/blob/b8dea79470f5/Raising_PRs/RFC_MINIMAX_M3/CHECKS_2026-10-25.md), measured on 8 x RTX 5060 Ti).
+- fsdp4 sums the four ranks in one reduce-scatter, while HSDP sums pairs over dp_shard and then the two replicas; re-adding the gradients captured at FSDP's reduction in each order reproduces both layouts' step-1 gradients bitwise ([reduce_emulate.txt](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/results_h100/runs/hsdp_s100/rebuild/reduce_emulate.txt)).
 
 ## Current scope
 - Parallelism: FSDP2 and HSDP; TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.
