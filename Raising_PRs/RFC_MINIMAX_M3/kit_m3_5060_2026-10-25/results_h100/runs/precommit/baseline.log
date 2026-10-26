@@ -1,0 +1,72 @@
+[INFO] Initializing environment for https://github.com/pre-commit/pre-commit-hooks.
+[WARNING] repo `https://github.com/pre-commit/pre-commit-hooks` uses deprecated stage names (commit, push) which will be removed in a future version.  Hint: often `pre-commit autoupdate --repo https://github.com/pre-commit/pre-commit-hooks` will fix this.  if it does not -- consider reporting an issue to that repo.
+[INFO] Initializing environment for https://github.com/Lucas-C/pre-commit-hooks.
+[INFO] Initializing environment for https://github.com/pycqa/flake8.
+[INFO] Initializing environment for https://github.com/pycqa/flake8:flake8-bugbear == 22.4.25,pep8-naming == 0.12.1,torchfix,flake8-pep585,flake8-new-union-types == 0.4.1.
+[INFO] Initializing environment for https://github.com/omnilib/ufmt.
+[INFO] Initializing environment for https://github.com/omnilib/ufmt:black == 22.12.0,usort == 1.0.5.
+[INFO] Initializing environment for https://github.com/jsh9/pydoclint.
+[INFO] Initializing environment for https://github.com/codespell-project/codespell.
+[INFO] Initializing environment for https://github.com/codespell-project/codespell:tomli.
+[INFO] Initializing environment for https://github.com/facebook/pyrefly-pre-commit.
+[INFO] Installing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/Lucas-C/pre-commit-hooks.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/pycqa/flake8.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/omnilib/ufmt.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/jsh9/pydoclint.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/codespell-project/codespell.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+trim trailing whitespace.................................................Passed
+check python ast.........................................................Passed
+check for merge conflicts................................................Passed
+don't commit to branch...................................................Passed
+check for added large files..............................................Passed
+fix end of files.........................................................Passed
+Insert license in comments...............................................Passed
+flake8...................................................................Passed
+Format files with µfmt...................................................Passed
+pydoclint................................................................Passed
+codespell................................................................Passed
+Pyrefly (type checking)..................................................Failed
+- hook id: pyrefly-check
+- files were modified by this hook
+
+INFO Checking project configured at `/root/m3/lint_base/pyproject.toml`
+ WARN /root/m3/lint_base/pyproject.toml: Invalid search-path: `/root/m3/pytorch` does not exist
+ WARN Redundant cast: `MTPBlock` is the same type as `MTPBlock` [redundant-cast]
+   --> torchtitan/models/deepseek_v4/model.py:237:34
+    |
+237 |                 for param in cast("MTPBlock", mtp_layer).h_proj.parameters()
+    |                                  -----------------------
+    |
+ WARN Redundant cast: `str` is the same type as `str` [redundant-cast]
+   --> torchtitan/models/muse_spark/renderer.py:682:32
+    |
+682 |             message_roles=[cast(str, message.get("role")) for message in messages],
+    |                                --------------------------
+    |
+=== Error Summary ===
+
+Top 30 Files by Error Count:
+/root/m3/lint_base/torchtitan/models/deepseek_v4/model.py: 1 error
+  redundant-cast: 1
+/root/m3/lint_base/torchtitan/models/muse_spark/renderer.py: 1 error
+  redundant-cast: 1
+
+Top Errors by Count:
+redundant-cast: 2 instances
+ INFO 0 errors (416 suppressed)
+ INFO Removed 1 unused error suppression(s) in 1 file(s)
+
+lychee-link-checker......................................................Passed

@@ -1,0 +1,3 @@
+08:03:44 tree 89fc094d dirty=0 torch 2.16.0.dev20261024+cu130 gpus 4 dataset c4_test measured_steps 100
+08:03:56 seed written
+08:04:49 warm dp1 gpus=0 rc=0 shim=1 seed_loaded=1 mesh=[pp=] last=[10 3.6586990356445312 1.6394940614700317]

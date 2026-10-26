@@ -1,0 +1,11 @@
+08:00:38 baseline rc=1 files=33 failed_hooks=[Pyrefly (type checking),]
+08:00:42 pyrefly baseline [ INFO 0 errors (416 suppressed)] main [ INFO 0 errors (418 suppressed)] only_on_baseline=0 only_on_main=0
+08:00:42 PRECOMMIT_DONE
+08:01:57 pyrefly pyrefly 0.45.1 at /root/m3/venv/bin/pyrefly
+08:01:58 pyrefly_probe base rc=0 rewrote []
+08:01:59 pyrefly_probe main rc=0 rewrote []
+08:01:59 PYREFLY_PROBE_DONE
+08:02:26 pyrefly pyrefly 0.45.1 at /root/m3/venv/bin/pyrefly
+08:02:30 pyrefly_probe base rc=1 rewrote [ torchtitan/components/data/multimodal/utils/video.py | 2 +-; 1 file changed, 1 insertion(+), 1 deletion(-);]
+08:02:33 pyrefly_probe main rc=1 rewrote [ torchtitan/components/data/multimodal/utils/video.py | 2 +-; 1 file changed, 1 insertion(+), 1 deletion(-);]
+08:02:33 PYREFLY_PROBE_DONE

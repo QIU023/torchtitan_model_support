@@ -1,0 +1,9 @@
+08:00:53 tree 9a5ab9eb torch 2.16.0.dev20261024+cu130
+08:01:53 diag_blocks rc=0
+08:02:04 diag_indexer rc=0
+08:02:22 diag_hidden_force rc=0
+08:02:41 diag_hidden_free rc=0
+08:03:03 diag_vision rc=0
+08:03:31 diag_attn0 rc=0
+08:03:42 diag_moe rc=0
+08:03:42 DIAG_DONE

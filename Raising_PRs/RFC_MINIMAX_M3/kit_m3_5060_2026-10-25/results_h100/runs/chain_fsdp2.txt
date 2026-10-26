@@ -1,0 +1,5 @@
+07:38:55 chain start
+07:38:55 setup ok: torch==2.16.0.dev20261024+cu130 torchvision==0.30.0.dev20261024+cu130 
+07:38:57 main tree 3ed5aa97
+07:44:06 dp4 table: 07:44:06 HSDP_DONE
+08:00:42 CHAIN_FSDP2_DONE

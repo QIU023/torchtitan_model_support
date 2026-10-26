@@ -1,0 +1,12 @@
+159 reduced parameters, micro-batches per parameter [2], input dtypes ['torch.bfloat16', 'torch.float32']
+1. reduce inputs bitwise equal across layouts: 1272/1272 (rank, parameter, micro-batch)
+2. HSDP tree rebuilt from the inputs vs HSDP's step-1 gradients: 159/159 parameters, 10100160/10100160 elements bitwise
+3. FSDP ring (0, 1, 2, 3) rebuilt vs fsdp4's step-1 gradients: 159/159 parameters, 10100160/10100160 elements bitwise
+3. FSDP ring (0, 1, 3, 2) rebuilt vs fsdp4's step-1 gradients: 144/159 parameters, 10029694/10100160 elements bitwise
+3. FSDP ring (0, 2, 1, 3) rebuilt vs fsdp4's step-1 gradients: 144/159 parameters, 10031237/10100160 elements bitwise
+3. FSDP ring (0, 2, 3, 1) rebuilt vs fsdp4's step-1 gradients: 146/159 parameters, 10031308/10100160 elements bitwise
+3. FSDP ring (0, 3, 1, 2) rebuilt vs fsdp4's step-1 gradients: 147/159 parameters, 10029392/10100160 elements bitwise
+3. FSDP ring (0, 3, 2, 1) rebuilt vs fsdp4's step-1 gradients: 144/159 parameters, 10006891/10100160 elements bitwise
+4. the two rebuilt trees against each other (ring (0, 1, 2, 3)): 126/159 parameters, 9970109/10100160 elements bitwise
+   the two runs against each other: 126/159 parameters, 9970109/10100160 elements bitwise
+   grads.pt holds 159 parameters, 43 of them all-zero, 0 not reduced by FSDP

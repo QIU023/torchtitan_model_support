@@ -1,0 +1,6 @@
+07:45:04 tree 9a5ab9eb torch 2.16.0.dev20261024+cu130
+07:45:39 parity bf16_free rc=0 shim=1
+07:46:17 parity bf16_imposed rc=0 shim=1
+07:46:46 parity fp32_free rc=0 shim=1
+07:46:47 parity fp32_imposed rc=0 shim=1
+07:46:47 PARITY_DONE

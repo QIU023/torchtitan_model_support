@@ -1,0 +1,17 @@
+m3_5060_shim: rank - flash attention selection off
+WARNING:absl:Failed to load jax profiler: No module named 'jax'
+W1026 08:03:36.360000 90181 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+W1026 08:03:36.398000 90181 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 975.71it/s]
+Loading weights:   0%|          | 0/182 [00:00<?, ?it/s]Loading weights: 100%|██████████| 182/182 [00:00<00:00, 1834.36it/s]
+router ids identical: True
+router weights (x route_scale):  max|diff| 0.000e+00 rel 0.00e+00
+shared expert: max|diff| 1.490e-08 rel 1.57e-07
+full MoE: max|diff| 7.848e-04 rel 4.74e-03
+routed part: max|diff| 7.848e-04 rel 5.98e-03
+titan routed expert params: {'w13.weight': (8, 2, 128, 256), 'w2.weight': (8, 256, 128)}
+HF experts params: {'gate_up_proj': (8, 256, 256), 'down_proj': (8, 256, 128)}
+routed vs HF on bf16-rounded inputs/weights: max|diff| 6.284e-04 rel 4.79e-03
+routed vs HF math with titan's bf16 rounding points: max|diff| 6.362e-04 rel 4.84e-03
+titan params + titan activation in fp32 vs HF fp32 routed: max|diff| 2.235e-08 rel 1.70e-07
+titan bf16 grouped_mm vs its own fp32 math: max|diff| 7.848e-04 rel 5.98e-03

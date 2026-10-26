@@ -1,0 +1,385 @@
++ nvidia-smi
+Mon Oct 26 07:33:34 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.91.07              Driver Version: 595.91.07      CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H100 NVL                On  |   00000000:21:00.0 Off |                    0 |
+| N/A   36C    P0             65W /  400W |       0MiB /  95830MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA H100 NVL                On  |   00000000:61:00.0 Off |                    0 |
+| N/A   30C    P0             61W /  400W |       0MiB /  95830MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA H100 NVL                On  |   00000000:81:00.0 Off |                    0 |
+| N/A   31C    P0             63W /  400W |       0MiB /  95830MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+|   3  NVIDIA H100 NVL                On  |   00000000:C1:00.0 Off |                    0 |
+| N/A   36C    P0             62W /  340W |       0MiB /  95830MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+++ nvidia-smi
+++ grep -o 'CUDA Version: [0-9.]*'
+++ grep -o '[0-9]*\.[0-9]*'
++ CUDA_DRV=13.2
++ '[' 13 -ge 13 ']'
++ CU=cu130
++ echo 'driver CUDA 13.2 -> cu130'
+driver CUDA 13.2 -> cu130
++ command -v uv
+/usr/local/bin/uv
++ '[' '!' -d /root/m3/tt ']'
++ git clone --filter=blob:none --no-checkout https://github.com/QIU023/torchtitan.git /root/m3/tt
+Cloning into '/root/m3/tt'...
++ git -C /root/m3/tt fetch origin minimax_m3 minimax_m3_5d
+From https://github.com/QIU023/torchtitan
+ * branch              minimax_m3 -> FETCH_HEAD
+ * branch              minimax_m3_5d -> FETCH_HEAD
++ '[' -d /root/m3/wt_m3 ']'
++ git -C /root/m3/tt worktree add --detach /root/m3/wt_m3 9a5ab9ebe
+Preparing worktree (detached HEAD 9a5ab9eb)
+Updating files:   0% (2/1092)Updating files:   1% (11/1092)Updating files:   2% (22/1092)Updating files:   3% (33/1092)Updating files:   4% (44/1092)Updating files:   5% (55/1092)Updating files:   6% (66/1092)Updating files:   7% (77/1092)Updating files:   8% (88/1092)Updating files:   9% (99/1092)Updating files:  10% (110/1092)Updating files:  11% (121/1092)Updating files:  12% (132/1092)Updating files:  13% (142/1092)Updating files:  14% (153/1092)Updating files:  15% (164/1092)Updating files:  16% (175/1092)Updating files:  17% (186/1092)Updating files:  18% (197/1092)Updating files:  19% (208/1092)Updating files:  20% (219/1092)Updating files:  21% (230/1092)Updating files:  22% (241/1092)Updating files:  23% (252/1092)Updating files:  24% (263/1092)Updating files:  25% (273/1092)Updating files:  26% (284/1092)Updating files:  27% (295/1092)Updating files:  28% (306/1092)Updating files:  29% (317/1092)Updating files:  30% (328/1092)Updating files:  31% (339/1092)Updating files:  32% (350/1092)Updating files:  33% (361/1092)Updating files:  34% (372/1092)Updating files:  35% (383/1092)Updating files:  36% (394/1092)Updating files:  37% (405/1092)Updating files:  38% (415/1092)Updating files:  39% (426/1092)Updating files:  40% (437/1092)Updating files:  41% (448/1092)Updating files:  42% (459/1092)Updating files:  43% (470/1092)Updating files:  44% (481/1092)Updating files:  45% (492/1092)Updating files:  46% (503/1092)Updating files:  47% (514/1092)Updating files:  48% (525/1092)Updating files:  49% (536/1092)Updating files:  50% (546/1092)Updating files:  51% (557/1092)Updating files:  52% (568/1092)Updating files:  53% (579/1092)Updating files:  54% (590/1092)Updating files:  55% (601/1092)Updating files:  56% (612/1092)Updating files:  57% (623/1092)Updating files:  58% (634/1092)Updating files:  59% (645/1092)Updating files:  60% (656/1092)Updating files:  61% (667/1092)Updating files:  62% (678/1092)Updating files:  63% (688/1092)Updating files:  64% (699/1092)Updating files:  65% (710/1092)Updating files:  66% (721/1092)Updating files:  67% (732/1092)Updating files:  68% (743/1092)Updating files:  69% (754/1092)Updating files:  70% (765/1092)Updating files:  71% (776/1092)Updating files:  72% (787/1092)Updating files:  73% (798/1092)Updating files:  74% (809/1092)Updating files:  75% (819/1092)Updating files:  76% (830/1092)Updating files:  77% (841/1092)Updating files:  78% (852/1092)Updating files:  79% (863/1092)Updating files:  80% (874/1092)Updating files:  81% (885/1092)Updating files:  82% (896/1092)Updating files:  83% (907/1092)Updating files:  84% (918/1092)Updating files:  85% (929/1092)Updating files:  86% (940/1092)Updating files:  87% (951/1092)Updating files:  88% (961/1092)Updating files:  89% (972/1092)Updating files:  90% (983/1092)Updating files:  91% (994/1092)Updating files:  92% (1005/1092)Updating files:  93% (1016/1092)Updating files:  94% (1027/1092)Updating files:  95% (1038/1092)Updating files:  96% (1049/1092)Updating files:  97% (1060/1092)Updating files:  98% (1071/1092)Updating files:  99% (1082/1092)Updating files: 100% (1092/1092)Updating files: 100% (1092/1092), done.
+HEAD is now at 9a5ab9eb minimax_m3: add MiniMax M3 with MiniMax Sparse Attention on FSDP2
++ '[' -d /root/m3/wt_m3_5d ']'
++ git -C /root/m3/tt worktree add --detach /root/m3/wt_m3_5d 89fc094d1
+Preparing worktree (detached HEAD 89fc094d)
+HEAD is now at 89fc094d minimax_m3: run on TP/SP, EP and PP
++ git -C /root/m3/wt_m3 log --oneline -1
+9a5ab9eb minimax_m3: add MiniMax M3 with MiniMax Sparse Attention on FSDP2
++ git -C /root/m3/wt_m3_5d log --oneline -1
+89fc094d minimax_m3: run on TP/SP, EP and PP
++ '[' -d /root/m3/venv ']'
++ uv venv --python 3.12 /root/m3/venv
+Using CPython 3.12.3 interpreter at: /usr/bin/python3.12
+Creating virtual environment at: m3/venv
+Activate with: source m3/venv/bin/activate
++ . /root/m3/venv/bin/activate
+++ '[' -n x ']'
+++ '[' /root/m3/venv/bin/activate = /root/m3/kit/setup_h100.sh ']'
+++ '[' false = true ']'
+++ deactivate nondestructive
+++ unset -f pydoc
+++ '[' -z '' ']'
+++ '[' -z '' ']'
+++ hash -r
+++ '[' -z '' ']'
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/root/m3/venv
+++ '[' linux-gnu = cygwin ']'
+++ '[' linux-gnu = msys ']'
+++ export VIRTUAL_ENV
+++ '[' false = true ']'
+++ _OLD_VIRTUAL_PATH=/opt/instance-tools/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/root/m3/venv/bin:/opt/instance-tools/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' x '!=' x ']'
++++ basename /root/m3/venv
+++ VIRTUAL_ENV_PROMPT=venv
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -z '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1=
+++ PS1='(venv) '
+++ export PS1
+++ alias pydoc
+++ true
+++ hash -r
++ IDX=https://download.pytorch.org/whl/nightly/cu130
++ uv pip install --pre torch==2.16.0.dev20261024+cu130 torchvision==0.30.0.dev20261024+cu130 --index-url https://download.pytorch.org/whl/nightly/cu130
+Using Python 3.12.3 environment at: m3/venv
+Resolved 32 packages in 3.02s
+Downloading numpy (16.0MiB)
+Downloading networkx (2.0MiB)
+Downloading sympy (6.0MiB)
+Downloading nvidia-nccl-cu13 (291.0MiB)
+Downloading cuda-bindings (6.8MiB)
+Downloading pillow (6.6MiB)
+Downloading setuptools (1.2MiB)
+Downloading nvidia-cuda-cccl (3.7MiB)
+Downloading nvidia-cuda-nvrtc (86.0MiB)
+Downloading nvidia-nvshmem-cu13 (129.1MiB)
+Downloading triton (272.4MiB)
+Downloading nvidia-cufft (204.2MiB)
+Downloading torchvision (7.1MiB)
+Downloading nvidia-cusolver (191.6MiB)
+ Downloaded setuptools
+Downloading torch (593.7MiB)
+Downloading nvidia-cusparselt-cu13 (162.3MiB)
+Downloading nvidia-nvjitlink (40.5MiB)
+Downloading nvidia-cublas (403.5MiB)
+Downloading nvidia-cudnn-cu13 (495.1MiB)
+ Downloaded torchvision
+Downloading nvidia-cusparse (139.2MiB)
+Downloading nvidia-cufile (1.2MiB)
+Downloading nvidia-cuda-runtime (2.1MiB)
+Downloading nvidia-cuda-cupti (10.2MiB)
+ Downloaded nvidia-cuda-cccl
+ Downloaded nvidia-cufile
+ Downloaded networkx
+ Downloaded nvidia-cuda-runtime
+ Downloaded triton
+ Downloaded nvidia-cuda-cupti
+ Downloaded torch
+ Downloaded sympy
+ Downloaded pillow
+ Downloaded cuda-bindings
+ Downloaded numpy
+ Downloaded nvidia-nvjitlink
+ Downloaded nvidia-cuda-nvrtc
+ Downloaded nvidia-nccl-cu13
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cusparselt-cu13
+ Downloaded nvidia-cusolver
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cublas
+ Downloaded nvidia-cudnn-cu13
+Prepared 32 packages in 51.78s
+Installed 32 packages in 1.78s
+ + cuda-bindings==13.4.4
+ + cuda-pathfinder==1.8.3
+ + cuda-toolkit==13.0.3.0
+ + filelock==4.2.0
+ + fsspec==2026.9.0
+ + jinja2==3.1.6
+ + markupsafe==3.0.2
+ + mpmath==1.3.0
+ + networkx==3.7
+ + numpy==2.5.4
+ + nvidia-cublas==13.1.1.3
+ + nvidia-cuda-cccl==13.3.4.3.1
+ + nvidia-cuda-cupti==13.0.85
+ + nvidia-cuda-nvrtc==13.0.88
+ + nvidia-cuda-runtime==13.0.96
+ + nvidia-cudnn-cu13==9.26.0.51
+ + nvidia-cufft==12.0.0.61
+ + nvidia-cufile==1.15.1.6
+ + nvidia-cusolver==12.0.4.66
+ + nvidia-cusparse==12.6.3.3
+ + nvidia-cusparselt-cu13==0.8.1
+ + nvidia-nccl-cu13==2.32.3
+ + nvidia-nvjitlink==13.4.92
+ + nvidia-nvshmem-cu13==3.7.2
+ + nvidia-nvtx==13.0.85
+ + pillow==12.3.0
+ + setuptools==78.1.0
+ + sympy==1.14.0
+ + torch==2.16.0.dev20261024+cu130
+ + torchvision==0.30.0.dev20261024+cu130
+ + triton==3.9.0+git0a6e13e6
+ + typing-extensions==4.16.0
++ python -c 'import torch, torchvision; print(f'\''torch=={torch.__version__}'\''); print(f'\''torchvision=={torchvision.__version__}'\'')'
++ cat /root/m3/torch_pins.txt
+torch==2.16.0.dev20261024+cu130
+torchvision==0.30.0.dev20261024+cu130
++ cd /root/m3/wt_m3_5d
++ uv pip install -c /root/m3/torch_pins.txt -r requirements.txt -r requirements-dev.txt
+Using Python 3.12.3 environment at: /root/m3/venv
+Resolved 142 packages in 835ms
+Downloading pygments (1.2MiB)
+Downloading hf-xet (4.0MiB)
+Downloading pydantic-core (2.1MiB)
+Downloading aiohttp (1.8MiB)
+Downloading grpcio (7.0MiB)
+Downloading nvidia-cutlass-dsl-libs-core (1.6MiB)
+Downloading openai (2.2MiB)
+Downloading nvidia-cutlass-dsl-libs-base (2.9MiB)
+Downloading tensorboard-data-server (6.3MiB)
+Downloading virtualenv (5.3MiB)
+Downloading transformers (12.2MiB)
+Downloading tiktoken (1.1MiB)
+Downloading pandas (11.5MiB)
+Downloading tokenizers (3.2MiB)
+Downloading openai-harmony (2.8MiB)
+Downloading apache-tvm-ffi (3.2MiB)
+Downloading pyarrow (47.8MiB)
+Downloading cuda-core (6.3MiB)
+Downloading tensorboard (5.3MiB)
+Downloading nvidia-cutlass-dsl-libs-cu12 (87.4MiB)
+Downloading wandb (19.4MiB)
+Downloading nvidia-cutlass-dsl-libs-cu13 (87.7MiB)
+Downloading array-record (3.7MiB)
+Downloading pyrefly (10.1MiB)
+ Downloaded tiktoken
+ Downloaded pygments
+ Downloaded nvidia-cutlass-dsl-libs-core
+ Downloaded aiohttp
+ Downloaded pydantic-core
+ Downloaded openai
+ Downloaded nvidia-cutlass-dsl-libs-base
+ Downloaded openai-harmony
+ Downloaded tokenizers
+ Downloaded apache-tvm-ffi
+ Downloaded hf-xet
+ Downloaded tensorboard
+ Downloaded virtualenv
+ Downloaded array-record
+ Downloaded tensorboard-data-server
+ Downloaded cuda-core
+ Downloaded grpcio
+ Downloaded pandas
+ Downloaded transformers
+ Downloaded wandb
+ Downloaded pyrefly
+ Downloaded pyarrow
+ Downloaded nvidia-cutlass-dsl-libs-cu12
+ Downloaded nvidia-cutlass-dsl-libs-cu13
+Prepared 112 packages in 13.59s
+Uninstalled 1 package in 6ms
+Installed 112 packages in 1.00s
+ + absl-py==2.5.1
+ + aiohappyeyeballs==2.7.1
+ + aiohttp==3.14.5
+ + aiosignal==1.4.0
+ + annotated-doc==0.0.5
+ + annotated-types==0.8.0
+ + anyio==4.15.1
+ + apache-tvm-ffi==0.1.15.post1
+ + array-record==0.8.6
+ + attn-gym==0.0.17
+ + attrs==26.1.0
+ + certifi==2026.10.23
+ + cfgv==3.5.0
+ + charset-normalizer==3.5.2
+ + click==8.5.0
+ + cloudpickle==3.1.2
+ + coverage==7.17.0
+ + cuda-core==1.2.2
+ + cuda-python==13.4.4
+ + cwevals==0.0.1b1
+ + datasets==4.7.0
+ + dill==0.4.0
+ + distlib==0.4.4
+ + distro==1.9.0
+ + einops==0.8.2
+ + etils==1.14.0
+ + expecttest==0.3.0
+ + frozenlist==1.8.0
+ - fsspec==2026.9.0
+ + fsspec==2026.2.0
+ + googleapis-common-protos==1.76.0
+ + grain==0.2.18
+ + grpcio==1.85.0
+ + h11==0.16.0
+ + hf-xet==1.7.0
+ + httpcore==1.0.9
+ + httpcore2==2.16.0
+ + httpx==0.28.1
+ + httpx2==2.16.0
+ + huggingface-hub==1.33.0
+ + identify==2.6.20
+ + idna==3.20
+ + iniconfig==2.3.1
+ + jiter==0.18.0
+ + markdown==3.11.2
+ + markdown-it-py==4.2.0
+ + mdurl==0.1.2
+ + multidict==7.2.1
+ + multiprocess==0.70.18
+ + nodeenv==1.11.0
+ + nvidia-cutlass-dsl==4.8.1
+ + nvidia-cutlass-dsl-libs-base==4.8.1
+ + nvidia-cutlass-dsl-libs-core==4.8.1
+ + nvidia-cutlass-dsl-libs-cu12==4.8.1
+ + nvidia-cutlass-dsl-libs-cu13==4.8.1
+ + openai==3.37.0
+ + openai-harmony==0.0.8
+ + opentelemetry-api==1.45.1
+ + opentelemetry-exporter-http-transport==0.66b1
+ + opentelemetry-exporter-otlp-common==0.66b1
+ + opentelemetry-exporter-otlp-proto-common==1.45.1
+ + opentelemetry-exporter-otlp-proto-http==1.45.1
+ + opentelemetry-proto==1.45.1
+ + opentelemetry-sdk==1.45.1
+ + opentelemetry-semantic-conventions==0.66b1
+ + packaging==26.3
+ + pandas==3.1.0
+ + platformdirs==4.13.5
+ + pluggy==1.7.0
+ + portpicker==1.6.0
+ + pre-commit==4.7.0
+ + prime-pydantic-config==0.4.3
+ + propcache==0.5.4
+ + protobuf==7.36.2
+ + psutil==7.2.2
+ + pyarrow==25.0.1
+ + pydantic==2.14.1
+ + pydantic-core==2.50.1
+ + pygments==2.21.0
+ + pyrefly==0.45.1
+ + pytest==7.3.2
+ + pytest-cov==7.1.0
+ + python-dateutil==3.0.0
+ + python-discovery==1.6.4
+ + pyyaml==6.0.3
+ + regex==2026.9.29
+ + renderers==0.1.12
+ + requests==2.34.2
+ + rich==15.0.0
+ + safetensors==0.8.0
+ + shellingham==1.5.4
+ + six==1.17.0
+ + sniffio==1.3.1
+ + spmd-types==0.3.1
+ + tensorboard==2.21.0
+ + tensorboard-data-server==0.7.2
+ + tiktoken==0.14.0
+ + tokenizers==0.23.3
+ + torch-checkpointing==0.1.1
+ + torch-remat==0.2.1
+ + tqdm==4.70.1
+ + transformers==5.20.2
+ + truststore==0.10.5
+ + typer==0.27.3
+ + typing-inspection==0.4.4
+ + tzdata==2026.5
+ + urllib3==2.8.0
+ + virtualenv==21.14.13
+ + wandb==0.31.0
+ + werkzeug==3.1.9
+ + xxhash==4.0.2
+ + yarl==1.25.1
+ + zipp==4.1.2
++ uv pip install -c /root/m3/torch_pins.txt -r .ci/docker/requirements-vlm.txt
+Using Python 3.12.3 environment at: /root/m3/venv
+Resolved 34 packages in 252ms
+Downloading av (33.4MiB)
+ Downloaded av
+Prepared 1 package in 582ms
+Installed 1 package in 91ms
+ + av==19.0.2
++ USE_CPP=0
++ uv pip install -c /root/m3/torch_pins.txt --pre --upgrade torchao --index-url https://download.pytorch.org/whl/nightly/cu130
+Using Python 3.12.3 environment at: /root/m3/venv
+Resolved 1 package in 1.31s
+Downloading torchao (3.1MiB)
+ Downloaded torchao
+Prepared 1 package in 1.02s
+Installed 1 package in 127ms
+ + torchao==0.19.0.dev20261026+cu130
++ uv pip freeze
+Using Python 3.12.3 environment at: /root/m3/venv
++ python -
+venv 2.16.0.dev20261024+cu130 884d7fae6a cuda 13.0 tv 0.30.0.dev20261024+cu130 triton 3.9.0
+devices 4 NVIDIA H100 NVL (9, 0)
+matmul 51.07524871826172
+W1026 07:35:10.796000 2775 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+attn_gym spmd_types torch_remat torch_checkpointing torchao import ok
++ touch /root/m3/SETUP_OK
++ echo SETUP_OK
+SETUP_OK

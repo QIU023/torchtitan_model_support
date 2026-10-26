@@ -1,0 +1,11 @@
+07:38:59 tree 9a5ab9eb dirty=0 torch 2.16.0.dev20261024+cu130 gpus 4 dataset c4_test measured_steps 100
+07:39:14 seed written
+07:40:00 warm fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.819634437561035 1.4188603162765503]
+07:40:32 warm hsdp2x2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.819115161895752 1.4228132963180542]
+07:41:40 measured fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.6828689575195312 0.42182454466819763]
+07:42:48 measured hsdp2x2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.6829400062561035 0.42543140053749084]
+07:44:03 measured fsdp4_again gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.6828689575195312 0.42182454466819763]
+07:44:06 HSDP_DONE
+07:44:29 rebuild fsdp4 rc=0 wrapped=4 step1=[1 8.032684326171875 1.7898486852645874]
+07:44:54 rebuild hsdp2x2 rc=0 wrapped=4 step1=[1 8.032684326171875 1.7898486852645874]
+07:45:02 REBUILD_DONE

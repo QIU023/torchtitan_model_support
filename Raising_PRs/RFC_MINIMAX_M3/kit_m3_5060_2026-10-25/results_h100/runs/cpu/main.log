@@ -1,0 +1,86 @@
+........................................................................ [  3%]
+.................................................................s...... [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 14%]
+........................................................................ [ 18%]
+.............................s.......................................... [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+........................................................................ [ 48%]
+........................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+.....................................s.................................. [ 74%]
+........................................................................ [ 78%]
+..............................xxx....................................... [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 89%]
+........................................................................ [ 93%]
+.........................................sssssssssssss.................. [ 97%]
+......................................................                   [100%]
+=============================== warnings summary ===============================
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py: 16 warnings
+  <string>:8: UserWarning: `barrier_config=None` requires `write_to_temp_dir=False`. Explicitly set `write_to_temp_dir=False` to hide this warning. This will become an error in a future version.
+
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_leaves_parameters_the_export_does_not_carry
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_reads_a_real_safetensors_export
+  /root/m3/venv/lib/python3.12/site-packages/torch_checkpointing/staging.py:201: UserWarning: Ignoring pin_memory flag for checkpoint staging as pinning memoryrequires CUDA, but CUDA is not available. 
+    self._state_dict_stager = StateDictStager(
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 20 warnings
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to save in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 15 warnings
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to load in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/tensor/_random.py:76: UserWarning: DTensor random operators may not have complete support on cpu device mesh
+    if not is_rng_supported_mesh(device_mesh):
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /root/m3/tt_main/torchtitan/distributed/utils.py:254: UserWarning: DTensor manual_seed() may not have complete support on cpu device mesh
+    torch.distributed.tensor._random.manual_seed(
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /root/m3/venv/lib/python3.12/site-packages/spmd_types/_collectives.py:336: FutureWarning: `torch.distributed._functional_collectives.all_gather_tensor` is deprecated. Please use `torch.distributed.functional_collectives.all_gather_single` instead.
+    funcol.all_gather_tensor(x, gather_dim, pg), dtype_options.async_op
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /root/m3/venv/lib/python3.12/site-packages/spmd_types/_collectives.py:681: FutureWarning: `torch.distributed._functional_collectives.reduce_scatter_tensor` is deprecated. Please use `torch.distributed.functional_collectives.reduce_scatter_single` instead.
+    funcol.reduce_scatter_tensor(x, "sum", scatter_dim, pg),
+
+tests/unit_tests/cpu/models/deepseek_v3/test_deepseek_v3_mla_compile.py::test_compiled_mla_qk_matches_eager[True]
+  /root/m3/venv/lib/python3.12/site-packages/torch/_inductor/lowering.py:2827: UserWarning: Torchinductor does not support code generation for complex operators. Performance may be worse than eager.
+    warnings.warn(
+
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[4]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[128]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_dsa.py::TestDSVPackedDocuments::test_packed_attention_matches_each_document_alone
+  /root/m3/tt_main/torchtitan/models/deepseek_v4/compressor.py:144: UserWarning: In CPU autocast, but the target dtype is not supported. Disabling autocast.
+  CPU Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.
+    with torch.autocast(device_type=x.device.type, dtype=torch.float32):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+---------------- generated xml file: /root/m3/runs/cpu/main.xml ----------------
+1907 passed, 18 skipped, 3 xfailed, 77 warnings in 585.97s (0:09:45)

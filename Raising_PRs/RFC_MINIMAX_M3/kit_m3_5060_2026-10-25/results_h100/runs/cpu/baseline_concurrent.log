@@ -1,0 +1,1033 @@
+........................................................................ [  3%]
+.................................................................s...... [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 14%]
+........................................................................ [ 18%]
+.............................s.......................................... [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 44%]
+................FFFFFFFF................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 66%]
+........................................................................ [ 70%]
+.............................................................s.......... [ 73%]
+........................................................................ [ 77%]
+......................................................xxx............... [ 81%]
+........................................................................ [ 84%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+.................................................................sssssss [ 96%]
+ssssss.................................................................. [ 99%]
+......                                                                   [100%]
+=================================== FAILURES ===================================
+___ TestParallelismContextMeshOperations.test_expert_parallelism_validation ____
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_expert_parallelism_validation>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_expert_parallelism_validation>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '0'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03ba0>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d069c60>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+_ TestParallelismContextMeshOperations.test_from_config_saves_parallelism_folder _
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_from_config_saves_parallelism_folder>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_from_config_saves_parallelism_folder>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '1'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03350>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d0765c0>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+_ TestParallelismContextMeshOperations.test_from_config_skips_mesh_build_without_parallelism_folder _
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_from_config_skips_mesh_build_without_parallelism_folder>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_from_config_skips_mesh_build_without_parallelism_folder>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '2'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03a70>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d076660>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+_______ TestParallelismContextMeshOperations.test_get_mesh_invalid_name ________
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_invalid_name>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_invalid_name>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '3'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03480>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d076ac0>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+____ TestParallelismContextMeshOperations.test_get_mesh_lazy_initialization ____
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_lazy_initialization>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_lazy_initialization>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '4'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03cd0>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d077ec0>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+______ TestParallelismContextMeshOperations.test_get_mesh_with_list_input ______
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_with_list_input>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_get_mesh_with_list_input>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '5'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec029d0>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d1ce840>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+_ TestParallelismContextMeshOperations.test_real_pp_group_for_fake_spmd_is_used_during_mesh_construction _
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_real_pp_group_for_fake_spmd_is_used_during_mesh_construction>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_real_pp_group_for_fake_spmd_is_used_during_mesh_construction>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '6'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03ba0>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d0767a0>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+____ TestParallelismContextMeshOperations.test_single_rank_mesh_operations _____
+
+self = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_single_rank_mesh_operations>
+
+    def setUp(self):
+        """Initialize distributed environment for CPU testing."""
+        if not dist.is_initialized():
+>           dist.init_process_group(
+                backend="gloo",
+                init_method="tcp://localhost:12356",
+                world_size=1,
+                rank=0,
+            )
+
+self       = <tests.unit_tests.cpu.distributed.test_parallelism_context.TestParallelismContextMeshOperations testMethod=test_single_rank_mesh_operations>
+
+tests/unit_tests/cpu/distributed/test_parallelism_context.py:541: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:85: in wrapper
+    return func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5300>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+        msg_dict   = {'error': 'The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use', 'func_name': 'init_process_group'}
+../venv/lib/python3.12/site-packages/torch/distributed/c10d_logger.py:99: in wrapper
+    func_return = func(*args, **kwargs)
+        args       = ()
+        func       = <function init_process_group at 0x7c9dacda5260>
+        kwargs     = {'backend': 'gloo', 'init_method': 'tcp://localhost:12356', 'rank': 0, 'world_size': 1}
+../venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:2733: in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+        _ranks     = None
+        acc        = device(type='cuda')
+        backend    = 'gloo'
+        device_id  = None
+        enable_reconfigure = False
+        group_name = '7'
+        init_method = 'tcp://localhost:12356'
+        pg_options = None
+        rank       = 0
+        rendezvous_iterator = <generator object _tcp_rendezvous_handler at 0x7c9a2ec03350>
+        store      = None
+        timeout    = datetime.timedelta(seconds=1800)
+        world_size = 1
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:248: in _tcp_rendezvous_handler
+    store = _create_c10d_store(
+        _error     = <function _tcp_rendezvous_handler.<locals>._error at 0x7c9d2d1ceca0>
+        kwargs     = {}
+        query_dict = {'rank': '0', 'world_size': '1'}
+        rank       = 0
+        result     = ParseResult(scheme='tcp', netloc='localhost:12356', path='', params='', query='rank=0&world_size=1', fragment='')
+        timeout    = datetime.timedelta(seconds=1800)
+        url        = 'tcp://localhost:12356?rank=0&world_size=1'
+        use_libuv  = True
+        world_size = 1
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+hostname = 'localhost', port = 12356, rank = 0, world_size = 1
+timeout = datetime.timedelta(seconds=1800), use_libuv = True
+
+    def _create_c10d_store(
+        hostname, port, rank, world_size, timeout, use_libuv=True
+    ) -> Store:
+        """
+        Smartly creates a c10d Store object on ``rank`` based on whether we need to reuse agent store.
+    
+        The TCPStore server is assumed to be hosted
+        on ``hostname:port``.
+    
+        By default, the TCPStore server uses the asynchronous implementation
+        ``LibUVStoreDaemon`` which utilizes libuv.
+    
+        If ``torchelastic_use_agent_store()`` is ``True`` *and* ``hostname:port`` is
+        the agent's own ``MASTER_ADDR:MASTER_PORT``, then it is assumed that the
+        agent leader (node rank 0) hosts the TCPStore server there. Hence
+        ALL ranks will create and return a TCPStore client (e.g. ``start_daemon=False``).
+    
+        Otherwise rank 0 will host the TCPStore (with multi-tenancy) and it is
+        assumed that rank 0's hostname and port are correctly passed via
+        ``hostname`` and ``port``. All non-zero ranks will create and return a
+        TCPStore client.
+        """
+        # check if port is uint16_t
+        if not 0 <= port < 2**16:
+            raise ValueError(f"port must have value from 0 to 65535 but was {port}.")
+    
+        if _agent_store_serves(hostname, port):
+            # We create a new TCPStore for every retry so no need to add prefix for each attempt.
+            return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=False,
+                timeout=timeout,
+            )
+        else:
+            start_daemon = rank == 0
+>           return TCPStore(
+                host_name=hostname,
+                port=port,
+                world_size=world_size,
+                is_master=start_daemon,
+                timeout=timeout,
+                multi_tenant=True,
+                use_libuv=use_libuv,
+            )
+E           torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. port: 12356, useIpv6: false, code: -98, name: EADDRINUSE, message: address already in use
+
+hostname   = 'localhost'
+port       = 12356
+rank       = 0
+start_daemon = True
+timeout    = datetime.timedelta(seconds=1800)
+use_libuv  = True
+world_size = 1
+
+../venv/lib/python3.12/site-packages/torch/distributed/rendezvous.py:215: DistNetworkError
+=============================== warnings summary ===============================
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py: 16 warnings
+  <string>:8: UserWarning: `barrier_config=None` requires `write_to_temp_dir=False`. Explicitly set `write_to_temp_dir=False` to hide this warning. This will become an error in a future version.
+
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_leaves_parameters_the_export_does_not_carry
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_reads_a_real_safetensors_export
+  /root/m3/venv/lib/python3.12/site-packages/torch_checkpointing/staging.py:201: UserWarning: Ignoring pin_memory flag for checkpoint staging as pinning memoryrequires CUDA, but CUDA is not available. 
+    self._state_dict_stager = StateDictStager(
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 20 warnings
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to save in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 15 warnings
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to load in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /root/m3/venv/lib/python3.12/site-packages/torch/distributed/tensor/_random.py:76: UserWarning: DTensor random operators may not have complete support on cpu device mesh
+    if not is_rng_supported_mesh(device_mesh):
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /root/m3/wt_m3/torchtitan/distributed/utils.py:254: UserWarning: DTensor manual_seed() may not have complete support on cpu device mesh
+    torch.distributed.tensor._random.manual_seed(
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /root/m3/venv/lib/python3.12/site-packages/spmd_types/_collectives.py:336: FutureWarning: `torch.distributed._functional_collectives.all_gather_tensor` is deprecated. Please use `torch.distributed.functional_collectives.all_gather_single` instead.
+    funcol.all_gather_tensor(x, gather_dim, pg), dtype_options.async_op
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /root/m3/venv/lib/python3.12/site-packages/spmd_types/_collectives.py:681: FutureWarning: `torch.distributed._functional_collectives.reduce_scatter_tensor` is deprecated. Please use `torch.distributed.functional_collectives.reduce_scatter_single` instead.
+    funcol.reduce_scatter_tensor(x, "sum", scatter_dim, pg),
+
+tests/unit_tests/cpu/models/deepseek_v3/test_deepseek_v3_mla_compile.py::test_compiled_mla_qk_matches_eager[True]
+  /root/m3/venv/lib/python3.12/site-packages/torch/_inductor/lowering.py:2827: UserWarning: Torchinductor does not support code generation for complex operators. Performance may be worse than eager.
+    warnings.warn(
+
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[4]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[128]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_dsa.py::TestDSVPackedDocuments::test_packed_attention_matches_each_document_alone
+  /root/m3/wt_m3/torchtitan/models/deepseek_v4/compressor.py:144: UserWarning: In CPU autocast, but the target dtype is not supported. Disabling autocast.
+  CPU Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.
+    with torch.autocast(device_type=x.device.type, dtype=torch.float32):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+-------------- generated xml file: /root/m3/runs/cpu/baseline.xml --------------
+=========================== short test summary info ============================
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_expert_parallelism_validation
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_from_config_saves_parallelism_folder
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_from_config_skips_mesh_build_without_parallelism_folder
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_get_mesh_invalid_name
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_get_mesh_lazy_initialization
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_get_mesh_with_list_input
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_real_pp_group_for_fake_spmd_is_used_during_mesh_construction
+FAILED tests/unit_tests/cpu/distributed/test_parallelism_context.py::TestParallelismContextMeshOperations::test_single_rank_mesh_operations
+8 failed, 1923 passed, 18 skipped, 3 xfailed, 77 warnings in 587.49s (0:09:47)

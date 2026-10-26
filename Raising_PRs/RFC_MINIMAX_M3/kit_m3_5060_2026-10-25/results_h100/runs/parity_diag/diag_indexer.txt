@@ -1,0 +1,10 @@
+m3_5060_shim: rank - flash attention selection off
+WARNING:absl:Failed to load jax profiler: No module named 'jax'
+W1026 08:01:58.311000 87800 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+W1026 08:01:58.348000 87800 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 895.35it/s]
+Loading weights:   0%|          | 0/182 [00:00<?, ?it/s]Loading weights: 100%|██████████| 182/182 [00:00<00:00, 3831.63it/s]
+index q: HF (1, 4, 333, 32) TT (333, 4, 32)
+index_q: max|diff| 4.768e-07  max|ref| 3.976e+00  rel 1.20e-07
+index_k: max|diff| 2.384e-07  max|ref| 4.014e+00  rel 5.94e-08
+HF cos dtype torch.float32 shape (1, 333, 16)

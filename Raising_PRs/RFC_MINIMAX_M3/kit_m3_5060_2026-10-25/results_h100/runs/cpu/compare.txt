@@ -1,0 +1,6 @@
+main {'skipped': 21, 'passed': 1907}; branch {'skipped': 21, 'passed': 1931}
+failing or erroring on the branch only: 0
+failing on both: []
+tests new on the branch: 24; tests gone from the branch: []
+branch tests matching 'tests.unit_tests.cpu.models.minimax_m3': {'passed': 16}
+branch tests matching 'MiniMaxM3': {'passed': 2}

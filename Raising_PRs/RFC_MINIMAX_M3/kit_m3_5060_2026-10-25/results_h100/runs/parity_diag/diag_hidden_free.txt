@@ -1,0 +1,30 @@
+m3_5060_shim: rank - flash attention selection off
+WARNING:absl:Failed to load jax profiler: No module named 'jax'
+W1026 08:02:28.026000 88596 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+W1026 08:02:28.062000 88596 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 1025.39it/s]
+Loading HuggingFace MiniMax M3 code on cuda ...
+Loading weights:   0%|          | 0/182 [00:00<?, ?it/s]Loading weights: 100%|██████████| 182/182 [00:00<00:00, 4389.49it/s]
+Loading TorchTitan MiniMax M3 (debugmodel) on cuda ...
+/root/m3/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+tokens=(333,) pixel_values=(576, 1176) grid_thw=[[1, 24, 24]] HF grid_thw=[[1, 24, 24]]
+pixel values: max_diff=4.768e-07 num_differ=0/677376
+vision features: shape=(144, 256) cos=1.000000 max_diff=1.164e-08
+sparse attention key blocks: 9219/9324 selections match (98.9%)
+router choices: 2322/2331 selections match (99.6%)
+     0: max|diff| 1.164e-08  rel 2.85e-09  mean|diff| 8.45e-10
+ attn0: max|diff| 1.341e-07  rel 7.48e-07  mean|diff| 1.15e-08
+  ffn0: max|diff| 4.172e-07  rel 1.75e-06  mean|diff| 2.83e-08
+     1: max|diff| 4.098e-07  rel 9.99e-08  mean|diff| 3.33e-08
+ attn1: max|diff| 1.099e-07  rel 6.37e-07  mean|diff| 9.98e-09
+  ffn1: max|diff| 7.839e-04  rel 4.90e-03  mean|diff| 1.16e-04
+     2: max|diff| 7.839e-04  rel 1.92e-04  mean|diff| 1.16e-04
+ attn2: max|diff| 1.661e-02  rel 1.02e-01  mean|diff| 7.98e-05
+  ffn2: max|diff| 5.790e-03  rel 4.82e-02  mean|diff| 1.23e-04
+     3: max|diff| 1.894e-02  rel 4.61e-03  mean|diff| 2.26e-04
+     7: max|diff| 8.746e-02  rel 2.11e-02  mean|diff| 6.01e-04
+image token span: 172 - 315 of 333
+largest attn0 gaps at positions [225, 251, 260, 273, 287, 293, 297, 298] image? [True, True, True, True, True, True, True, True]
+attn0 gap: image tokens max 1.341104507446289e-07  text tokens max 7.450580596923828e-08
+text tokens before image max 7.450580596923828e-08  after image max 5.587935447692871e-08

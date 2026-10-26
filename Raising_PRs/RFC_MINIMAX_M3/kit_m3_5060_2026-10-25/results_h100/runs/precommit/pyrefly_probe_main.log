@@ -1,0 +1,31 @@
+Pyrefly (type checking)..................................................Failed
+- hook id: pyrefly-check
+- files were modified by this hook
+
+INFO Checking project configured at `/root/m3/lint_probe_main/pyproject.toml`
+ WARN /root/m3/lint_probe_main/pyproject.toml: Invalid search-path: `/root/m3/pytorch` does not exist
+ WARN Redundant cast: `MTPBlock` is the same type as `MTPBlock` [redundant-cast]
+   --> torchtitan/models/deepseek_v4/model.py:237:34
+    |
+237 |                 for param in cast("MTPBlock", mtp_layer).h_proj.parameters()
+    |                                  -----------------------
+    |
+ WARN Redundant cast: `str` is the same type as `str` [redundant-cast]
+   --> torchtitan/models/muse_spark/renderer.py:682:32
+    |
+682 |             message_roles=[cast(str, message.get("role")) for message in messages],
+    |                                --------------------------
+    |
+=== Error Summary ===
+
+Top 30 Files by Error Count:
+/root/m3/lint_probe_main/torchtitan/models/deepseek_v4/model.py: 1 error
+  redundant-cast: 1
+/root/m3/lint_probe_main/torchtitan/models/muse_spark/renderer.py: 1 error
+  redundant-cast: 1
+
+Top Errors by Count:
+redundant-cast: 2 instances
+ INFO 0 errors (418 suppressed)
+ INFO Removed 1 unused error suppression(s) in 1 file(s)
+
