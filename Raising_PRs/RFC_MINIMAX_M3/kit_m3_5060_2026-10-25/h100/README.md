@@ -22,3 +22,13 @@
    - 然后是 `chain_4d_h100.sh`：`run_m3_4d_h100.sh`（只用 FSDP，4 卡以内的格子，100 步）、`ep_param_diff.py`，以及 `run_tp_force_s100.sh`。
 
 `chain_h100.sh`、`chain_s100.sh` 是 H200 时期留在 kit 里的，这台机器上没有跑过。`shim/sitecustomize.py` 用来关掉 FA 选择（`M3_FA_OFF=1`）。
+
+## 4D 的 4 卡组合（10-26 结果）
+
+- 15 个格子，加上 3 个参照再跑一次，共 18 次 100 步的正式运行。全部 rank 的 54 个 loss 文件和 H200 那次（`../results_h200/runs/m4d_s100/`）逐字节相同；`table_4312.md` 和 `summary.md`（包括第 1 步的梯度对比）也完全相同。需要 8 卡的 14 个格子跳过了。
+- EP（`ep_param_diff.txt`）：ep2 x fsdp2 和 ep4 x fsdp4 都只有 14/159 个梯度和参照不同，全部是 routed experts 的 w13 和 w2。
+- TP 强制实验（`tpforce/`）：带 hook 的单卡记录和正式运行的 dp1 梯度 159/159 逐位相同。强制用单卡的选块和路由后，最差一组的相对 L2 差变化如下：
+  - tp2 x ep2：从 2.70e-2 降到 4.50e-3；
+  - tp4 x ep4：从 4.36e-2 降到 4.97e-3。
+- 探针不打印"已强制"的提示，但强制前后的梯度不同（同一份 seed、同样的数据、同一份 cache），说明替换确实生效了。
+- 用户定的是 4D 正文只用 5060 的数，所以这批结果目前不进任何正文。

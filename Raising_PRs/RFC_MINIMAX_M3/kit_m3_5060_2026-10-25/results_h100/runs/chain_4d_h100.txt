@@ -2,3 +2,5 @@
 07:56:31 superseded by chain_4d_h100_diag_first.sh (parity probes first)
 08:03:42 waiting for the FSDP2 chain
 08:03:42 start, after: 08:00:42 CHAIN_FSDP2_DONE
+08:45:24 matrix: 08:45:20 M4D_DONE
+08:46:50 CHAIN_4D_H100_DONE
