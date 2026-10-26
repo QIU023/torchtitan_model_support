@@ -2,6 +2,18 @@
 
 ## 状态（不粘贴）
 
+- **10-26 H200（`root@217.18.55.94`，4 x H200，driver 595 / CUDA 13.2，torch 2.16.0.dev20261024+cu130，和 5060 同一个 build）：**
+  - 用户："如果work的话最后body写h200"；"我们就100步，c4，按照我的4312来"。
+  - 协议：
+    - `c4_test`（2000 篇、369 万 token，100 步只读 11%，不会重复读）；
+    - 100 步，表照 #4312 的格式：第 1 / 10 / 50 / 100 步，每格原始值，下面写 identical 或百分比；
+    - 一个单卡 seed，一份 10 步预热的 cache，正式运行用 cache 副本，参照跑两次。
+  - kit 在 `kit_m3_5060_2026-10-25/h200/`，结果在 `results_h200/runs/`。正文里的链接钉在 logbook 提交 `b8dea79`（仓库已改名为 `torchtitan_model_support`）。
+  - 基线正文 Results 第二部分从 "Pending (H100)." 换成 H200 的 dp4 表（`results_h200/runs/hsdp_s100/table_4312.md`）：
+    - fsdp4 两次 100 步全同；
+    - HSDP 2 x 2 前 3 步逐位，从第 4 步的 grad norm、第 5 步的 loss 开始分开；
+    - 第 1 步梯度 126/159 逐位，最大 5.22e-8，没有符号翻转。
+  - 规约顺序的逐位重建是 5060 上做的，正文那句注明了 "measured on 8 x RTX 5060 Ti"。
 - **10-25 晚 4D 矩阵（`GOAL_M3_4D_MATRIX_2026-10-25.md`）：** 正文没动。
   - dp4 这条数据流在 5D 树上用 20 步重跑了 fsdp4（两次）和 HSDP 2 x 2：第 1 步 loss 和 grad norm 都逐位，第 1 步梯度的特征和白天定位的一样（117/159 逐位，最大 5.27e-8）。
   - 其余 HSDP 组合也全部跑通：ep2 x HSDP 2 x 2、HSDP 2 x 2 x pp2、HSDP 2 x 2 x tp2 x ep2、HSDP 2 x 4、HSDP 4 x 2、ep4 x HSDP 2 x 4。所以 README 和正文里的 HSDP 保留。
@@ -129,7 +141,18 @@ The parity test reduces the released HF config to `debugmodel`, loads the TorchT
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
 
-fsdp4 against HSDP 2 x 2 (dp_replicate 2 x dp_shard 2), both dp 4 and so on the same samples: Pending (H100).
+4 x H200, debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps; every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed. fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor. Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8dea79470f5/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h200/run_hsdp_h100.sh).
+
+HSDP matches FSDP bitwise through step 3 and parts from the grad norm at step 4, because its reduction adds the ranks' gradients in a different order.
+
+| cell | loss, step 1 | step 10 | step 50 | step 100 | grad norm, step 1 | step 10 | step 50 | step 100 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fsdp4 | `8.032684` | `3.497031` | `3.007276` | `2.682869` | `1.7898` | `1.0201` | `0.6219` | `0.4218` |
+| fsdp4, again | `8.032684`<br>identical | `3.497031`<br>identical | `3.007276`<br>identical | `2.682869`<br>identical | `1.7898`<br>identical | `1.0201`<br>identical | `0.6219`<br>identical | `0.4218`<br>identical |
+| HSDP 2 x 2 | `8.032684`<br>identical | `3.494834`<br>-0.06% | `3.005924`<br>-0.04% | `2.682940`<br>+0.00% | `1.7898`<br>identical | `1.0071`<br>-1.27% | `0.6005`<br>-3.43% | `0.4254`<br>+0.86% |
+
+- The step-1 gradients differ in 33 of 159 parameters, by at most 5.2e-8 in relative L2 norm, with no sign flips.
+- fsdp4 sums the four ranks in one reduce-scatter, while HSDP sums pairs over dp_shard and then the two replicas; re-adding the gradients captured at FSDP's reduction in each order reproduces both layouts' step-1 gradients bitwise ([CHECKS_2026-10-25.md](https://github.com/QIU023/torchtitan_model_support/blob/b8dea79470f5/Raising_PRs/RFC_MINIMAX_M3/CHECKS_2026-10-25.md), measured on 8 x RTX 5060 Ti).
 
 ## Current scope
 - Parallelism: FSDP2 and HSDP; TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.
