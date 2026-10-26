@@ -1,0 +1,51 @@
+00:24:49 tree 89fc094d dirty=0 torch 2.16.0.dev20261024+cu130 gpus 4 dataset c4_test measured_steps 100
+00:25:00 seed written
+00:25:54 warm dp1 gpus=0 rc=0 shim=1 seed_loaded=1 mesh=[pp=] last=[10 3.6586990356445312 1.6394940614700317]
+00:26:37 warm pp2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=2, dp_replicate=] last=[10 3.658247947692871 1.6393381357192993]
+00:27:11 warm pp2_vpp2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=2, dp_replicate=] last=[10 3.6617159843444824 1.6372421979904175]
+00:28:00 warm pp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=4, dp_replicate=] last=[10 3.6634931564331055 1.6397743225097656]
+00:28:00 skip pp8: needs 8 GPUs, box has 4
+00:28:59 warm tp2_ep2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[10 3.660215377807617 1.6323784589767456]
+00:30:06 warm tp4_ep4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.6605851650238037 1.6357744932174683]
+00:30:58 warm tp2_ep2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[10 3.6597657203674316 1.6281262636184692]
+00:30:58 skip tp2_ep2_pp4: needs 8 GPUs, box has 4
+00:30:58 skip tp4_ep4_pp2: needs 8 GPUs, box has 4
+00:31:30 warm fsdp2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[10 3.789952278137207 1.3681895732879639]
+00:32:03 warm ep2_fsdp2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[10 3.790496587753296 1.364761233329773]
+00:32:41 warm fsdp2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[10 3.7928757667541504 1.3840200901031494]
+00:33:23 warm ep2_fsdp2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[10 3.7894015312194824 1.361208438873291]
+00:33:23 skip fsdp2_pp4: needs 8 GPUs, box has 4
+00:33:23 skip ep2_fsdp2_pp4: needs 8 GPUs, box has 4
+00:34:12 warm fsdp2_tp2_ep2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.7939038276672363 1.3799879550933838]
+00:34:57 warm fsdp2_tp2_ep4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.7923128604888916 1.3892183303833008]
+00:34:57 skip fsdp2_tp4_ep4: needs 8 GPUs, box has 4
+00:34:57 skip fsdp2_tp4_ep8: needs 8 GPUs, box has 4
+00:34:57 skip ep2_fsdp2_tp2_pp2: needs 8 GPUs, box has 4
+00:34:57 skip ep4_fsdp2_tp2_pp2: needs 8 GPUs, box has 4
+00:35:27 warm fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.819634437561035 1.4188603162765503]
+00:35:57 warm ep4_fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[10 3.8183038234710693 1.414014458656311]
+00:35:57 skip fsdp4_pp2: needs 8 GPUs, box has 4
+00:35:57 skip ep4_fsdp4_pp2: needs 8 GPUs, box has 4
+00:35:57 skip fsdp4_tp2_ep2: needs 8 GPUs, box has 4
+00:35:57 skip fsdp8: needs 8 GPUs, box has 4
+00:35:57 skip ep8_fsdp8: needs 8 GPUs, box has 4
+00:35:57 warm-up done, cache 204M
+00:39:13 measured dp1_again gpus=1 rc=0 shim=1 seed_loaded=1 mesh=[pp=] last=[100 2.7437310218811035 0.6904214024543762]
+00:39:13 measured dp1 gpus=0 rc=0 shim=1 seed_loaded=1 mesh=[pp=] last=[100 2.7437310218811035 0.6904214024543762]
+00:41:05 measured pp2_vpp2 gpus=2,3 rc=0 shim=2 seed_loaded=2 mesh=[pp=2, dp_replicate=] last=[100 2.741008758544922 0.6960604786872864]
+00:41:06 measured pp2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=2, dp_replicate=] last=[100 2.7451956272125244 0.7350291013717651]
+00:43:00 measured fsdp2 gpus=2,3 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[100 2.6818394660949707 0.4076113700866699]
+00:46:01 measured tp2_ep2 gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[100 2.738837718963623 0.6907073855400085]
+00:47:55 measured fsdp2_again gpus=0,1 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[100 2.6818394660949707 0.4076113700866699]
+00:48:14 measured ep2_fsdp2 gpus=2,3 rc=0 shim=2 seed_loaded=2 mesh=[pp=] last=[100 2.679805040359497 0.3812452554702759]
+00:49:47 measured pp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=4, dp_replicate=] last=[100 2.743246078491211 0.6968681812286377]
+00:54:49 measured tp4_ep4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.742544174194336 0.6887819170951843]
+00:57:43 measured tp2_ep2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[100 2.739328622817993 0.6995868682861328]
+00:59:10 measured fsdp2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[100 2.6835975646972656 0.3851480185985565]
+01:00:44 measured ep2_fsdp2_pp2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=2, dp_replicate=] last=[100 2.6806302070617676 0.36583465337753296]
+01:03:45 measured fsdp2_tp2_ep2 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.681126356124878 0.38301458954811096]
+01:06:42 measured fsdp2_tp2_ep4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.6808595657348633 0.3868198096752167]
+01:07:52 measured fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.682974338531494 0.4238434135913849]
+01:09:02 measured fsdp4_again gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.682974338531494 0.4238434135913849]
+01:10:25 measured ep4_fsdp4 gpus=0,1,2,3 rc=0 shim=4 seed_loaded=4 mesh=[pp=] last=[100 2.6842572689056396 0.41316118836402893]
+01:10:25 M4D_DONE

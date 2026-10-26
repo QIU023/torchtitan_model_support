@@ -1,0 +1,121 @@
+W1026 00:00:22.652000 10734 torch/distributed/run.py:982] 
+W1026 00:00:22.652000 10734 torch/distributed/run.py:982] *****************************************
+W1026 00:00:22.652000 10734 torch/distributed/run.py:982] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W1026 00:00:22.652000 10734 torch/distributed/run.py:982] *****************************************
+[rank0]:m3_5060_shim: rank 0 flash attention selection off
+[rank1]:m3_5060_shim: rank 1 flash attention selection off
+[rank0]:W1026 00:00:27.329000 10803 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+[rank0]:W1026 00:00:27.362000 10803 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+[rank1]:W1026 00:00:27.487000 10804 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+[rank1]:W1026 00:00:27.525000 10804 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+[rank0]:WARNING:absl:Failed to load jax profiler: No module named 'jax'
+[rank1]:WARNING:absl:Failed to load jax profiler: No module named 'jax'
+[rank0]:[rank0]:W1026 00:00:31.661000 10803 torch/distributed/tensor/_redistribute.py:394] While redistributing from (_StridedShard(dim=0, sf=2), Shard(dim=0)) to (Replicate(), Replicate()), 2 sequential all_gather operations will be performed. This is suboptimal: multiple collective operations have higher latency (separate kernel launches and synchronization points) and may give inconsistent results between ranks due to different reduction orders. it is not possible to merge non-ascending order all_gather operations.
+[rank1]:[rank1]:W1026 00:00:31.662000 10804 torch/distributed/tensor/_redistribute.py:394] While redistributing from (_StridedShard(dim=0, sf=2), Shard(dim=0)) to (Replicate(), Replicate()), 2 sequential all_gather operations will be performed. This is suboptimal: multiple collective operations have higher latency (separate kernel launches and synchronization points) and may give inconsistent results between ranks due to different reduction orders. it is not possible to merge non-ascending order all_gather operations.
+[rank0]:[titan] 2026-10-26 00:00:28,996 - __main__ - INFO - torchtitan version: 0.0.0+unknown (0.0.0 means __version__ is not defined correctly).
+[rank1]:[titan] 2026-10-26 00:00:29,155 - __main__ - INFO - torchtitan version: 0.0.0+unknown (0.0.0 means __version__ is not defined correctly).
+[rank0]:[titan] 2026-10-26 00:00:29,163 - torchtitan_recipes.data - WARNING - C4 document capacity is an estimate. Tune dataloader.max_num_documents for your workload to balance attention overhead and packing padding.
+[rank0]:[titan] 2026-10-26 00:00:29,164 - torchtitan.observability.structured_logger.jsonl_handler - INFO - Structured logging -> JSONL: /home/m3/runs/m4d/warm/ep2_fsdp2/out/structured_logs/training.global_rank_0.20261026-000029-QN3CT0.jsonl
+[rank1]:[titan] 2026-10-26 00:00:29,327 - torchtitan_recipes.data - WARNING - C4 document capacity is an estimate. Tune dataloader.max_num_documents for your workload to balance attention overhead and packing padding.
+[rank1]:[titan] 2026-10-26 00:00:29,329 - torchtitan.observability.structured_logger.jsonl_handler - INFO - Structured logging -> JSONL: /home/m3/runs/m4d/warm/ep2_fsdp2/out/structured_logs/training.global_rank_1.20261026-000029-S305Q7.jsonl
+[rank0]:[titan] 2026-10-26 00:00:29,408 - torchtitan.distributed.utils - WARNING - TORCH_NCCL_ASYNC_ERROR_HANDLING=1 will be overridden to 3.
+[rank1]:[titan] 2026-10-26 00:00:29,510 - torchtitan.distributed.utils - WARNING - TORCH_NCCL_ASYNC_ERROR_HANDLING=1 will be overridden to 3.
+[rank1]:[titan] 2026-10-26 00:00:30,142 - torchtitan.tools.garbage_collector - INFO - [GC] Initial GC collection took 0.00 seconds
+[rank1]:[titan] 2026-10-26 00:00:30,142 - torchtitan.distributed.utils - INFO - Deterministic algorithm enabled (expect perf degradation).
+[rank1]:[titan] 2026-10-26 00:00:30,156 - torchtitan.distributed.parallelism_context - INFO - Building device mesh with parallelism: pp=1, dp_replicate=1, dp_shard=2, cp=1, tp=1, ep=2
+[rank0]:[titan] 2026-10-26 00:00:30,142 - torchtitan.tools.garbage_collector - INFO - [GC] Initial GC collection took 0.00 seconds
+[rank0]:[titan] 2026-10-26 00:00:30,142 - torchtitan.distributed.utils - INFO - Deterministic algorithm enabled (expect perf degradation).
+[rank0]:[titan] 2026-10-26 00:00:30,155 - torchtitan.distributed.parallelism_context - INFO - Building device mesh with parallelism: pp=1, dp_replicate=1, dp_shard=2, cp=1, tp=1, ep=2
+[rank1]:[titan] 2026-10-26 00:00:30,212 - torchtitan.distributed.parallelism_context - INFO - Successfully created meshes with active axes: ['loss', 'ep', 'dp', 'dp_shard']
+[rank1]:[titan] 2026-10-26 00:00:30,215 - torchtitan.observability.metrics - INFO - CUDA capacity: NVIDIA H200 with 139.80GiB memory
+[rank1]:[titan] 2026-10-26 00:00:30,216 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[rank1]:[titan] 2026-10-26 00:00:30,216 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[rank1]:[titan] 2026-10-26 00:00:30,221 - torchtitan.tools.utils - WARNING - Error running lspci: [Errno 2] No such file or directory: 'lspci', fallback to use device_name
+[rank1]:[titan] 2026-10-26 00:00:30,221 - torchtitan.components.tokenizer - INFO - Loading tokenizer from tokenizer.json
+[rank0]:[titan] 2026-10-26 00:00:30,212 - torchtitan.distributed.parallelism_context - INFO - Successfully created meshes with active axes: ['loss', 'ep', 'dp', 'dp_shard']
+[rank0]:[titan] 2026-10-26 00:00:30,214 - torchtitan.observability.metrics - INFO - CUDA capacity: NVIDIA H200 with 139.80GiB memory
+[rank0]:[titan] 2026-10-26 00:00:30,215 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[rank0]:[titan] 2026-10-26 00:00:30,215 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[rank0]:[titan] 2026-10-26 00:00:30,220 - torchtitan.tools.utils - WARNING - Error running lspci: [Errno 2] No such file or directory: 'lspci', fallback to use device_name
+[rank0]:[titan] 2026-10-26 00:00:30,220 - torchtitan.components.tokenizer - INFO - Loading tokenizer from tokenizer.json
+[rank1]:[titan] 2026-10-26 00:00:30,929 - httpx - INFO - HTTP Request: HEAD https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/json/json.py "HTTP/1.1 200 OK"
+[rank0]:[titan] 2026-10-26 00:00:30,972 - httpx - INFO - HTTP Request: HEAD https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/json/json.py "HTTP/1.1 200 OK"
+[rank1]:[titan] 2026-10-26 00:00:30,994 - torchtitan.models.base.state_dict_adapter - WARNING - model.safetensors.index.json not found at hf_assets_path: ./tests/assets/tokenizer/model.safetensors.index.json.                     Defaulting to saving a single safetensors file if checkpoint is saved in HF format
+[rank1]:[titan] 2026-10-26 00:00:30,996 - torchtitan.models.common.flops - INFO - Total parameter count: 10,488,512, active parameters: 4,861,120
+[rank1]:[titan] 2026-10-26 00:00:31,024 - torchtitan.distributed.activation_remat - INFO - Applied DefaultActivationRematConfig to 8 transformer blocks. Save patterns: ['*'], recompute patterns: ['*routed_experts.w13.*']
+[rank1]:[titan] 2026-10-26 00:00:31,024 - torchtitan.distributed.activation_remat - INFO - Applied DefaultActivationRematConfig to 2 transformer blocks. Save patterns: ['*'], recompute patterns: ['*routed_experts.w13.*']
+[rank0]:[titan] 2026-10-26 00:00:31,036 - torchtitan.models.base.state_dict_adapter - WARNING - model.safetensors.index.json not found at hf_assets_path: ./tests/assets/tokenizer/model.safetensors.index.json.                     Defaulting to saving a single safetensors file if checkpoint is saved in HF format
+[rank0]:[titan] 2026-10-26 00:00:31,037 - torchtitan.models.common.flops - INFO - Total parameter count: 10,488,512, active parameters: 4,861,120
+[rank0]:[titan] 2026-10-26 00:00:31,065 - torchtitan.distributed.activation_remat - INFO - Applied DefaultActivationRematConfig to 8 transformer blocks. Save patterns: ['*'], recompute patterns: ['*routed_experts.w13.*']
+[rank0]:[titan] 2026-10-26 00:00:31,065 - torchtitan.distributed.activation_remat - INFO - Applied DefaultActivationRematConfig to 2 transformer blocks. Save patterns: ['*'], recompute patterns: ['*routed_experts.w13.*']
+[rank1]:[titan] 2026-10-26 00:00:31,169 - torchtitan.distributed.fsdp - INFO - Applied FSDP to the model
+[rank0]:[titan] 2026-10-26 00:00:31,208 - torchtitan.distributed.fsdp - INFO - Applied FSDP to the model
+[rank1]:[titan] 2026-10-26 00:00:31,837 - torchtitan.training_engine - INFO - Model MiniMaxM3Model.Config size: 10,488,512 total parameters
+[rank1]:[titan] 2026-10-26 00:00:31,839 - torchtitan.components.optim.optimizer - INFO - Optimizer AdamW (model_part=0): 159 params [.*] {'lr': 0.0008, 'betas': (0.9, 0.95), 'eps': 1e-08, 'weight_decay': 0.1, 'foreach': None, 'fused': True}
+[rank1]:[titan] 2026-10-26 00:00:31,843 - torchtitan.components.checkpointer.dcp - INFO - Checkpointing active. Checkpoints will be loaded from and saved to /home/m3/runs/m4d/warm/ep2_fsdp2/out/checkpoint
+[rank1]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - Peak FLOPS used for computing MFU: 9.890e+14
+[rank1]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - CUDA memory usage for model: 0.03GiB(0.02%)
+[rank1]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - Trainer is initialized with 512 tokens per DP rank, 4096 tokens per train step, gradient accumulation steps 4, maximum context length 512, total steps 10 (warmup 2)
+[rank1]:[titan] 2026-10-26 00:00:31,844 - torchtitan.components.checkpointer.base - INFO - Loading the checkpoint from /home/m3/runs/m4d/seed/step-0.
+[rank0]:[titan] 2026-10-26 00:00:31,837 - torchtitan.training_engine - INFO - Model MiniMaxM3Model.Config size: 10,488,512 total parameters
+[rank0]:[titan] 2026-10-26 00:00:31,839 - torchtitan.components.optim.optimizer - INFO - Optimizer AdamW (model_part=0): 159 params [.*] {'lr': 0.0008, 'betas': (0.9, 0.95), 'eps': 1e-08, 'weight_decay': 0.1, 'foreach': None, 'fused': True}
+[rank0]:[titan] 2026-10-26 00:00:31,843 - torchtitan.components.checkpointer.dcp - INFO - Checkpointing active. Checkpoints will be loaded from and saved to /home/m3/runs/m4d/warm/ep2_fsdp2/out/checkpoint
+[rank0]:/home/m3/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+[rank0]:  warn_once(FP_FUSION_DEFAULT_WARNING)
+[rank1]:/home/m3/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+[rank1]:  warn_once(FP_FUSION_DEFAULT_WARNING)
+[rank0]:/home/m3/venv/lib/python3.12/site-packages/torch/distributed/fsdp/_fully_shard/_fsdp_state.py:362: UserWarning: FSDP2-wrapped module (FSDPMiniMaxM3TransformerBlock) returned a view tensor. An in-place op on this view (e.g., `x += y`) will silently drop the pre-backward hook and skip the all-gather, which can cause backward to fail or produce wrong gradients. Use out-of-place ops (`out = out + y`, not `out += y`) or `.clone()` the output before any in-place op.
+[rank0]:  output = self._register_pre_backward_hook(output)
+[rank1]:/home/m3/venv/lib/python3.12/site-packages/torch/distributed/fsdp/_fully_shard/_fsdp_state.py:362: UserWarning: FSDP2-wrapped module (FSDPMiniMaxM3TransformerBlock) returned a view tensor. An in-place op on this view (e.g., `x += y`) will silently drop the pre-backward hook and skip the all-gather, which can cause backward to fail or produce wrong gradients. Use out-of-place ops (`out = out + y`, not `out += y`) or `.clone()` the output before any in-place op.
+[rank1]:  output = self._register_pre_backward_hook(output)
+[rank0]:/home/m3/venv/lib/python3.12/site-packages/torch/distributed/fsdp/_fully_shard/_fsdp_state.py:362: UserWarning: FSDP2-wrapped module (FSDPMiniMaxM3TransformerBlock) returned a view tensor. An in-place op on this view (e.g., `x += y`) will silently drop the pre-backward hook and skip the all-gather, which can cause backward to fail or produce wrong gradients. Use out-of-place ops (`out = out + y`, not `out += y`) or `.clone()` the output before any in-place op.
+[rank0]:  output = self._register_pre_backward_hook(output)
+[rank1]:/home/m3/venv/lib/python3.12/site-packages/torch/distributed/fsdp/_fully_shard/_fsdp_state.py:362: UserWarning: FSDP2-wrapped module (FSDPMiniMaxM3TransformerBlock) returned a view tensor. An in-place op on this view (e.g., `x += y`) will silently drop the pre-backward hook and skip the all-gather, which can cause backward to fail or produce wrong gradients. Use out-of-place ops (`out = out + y`, not `out += y`) or `.clone()` the output before any in-place op.
+[rank1]:  output = self._register_pre_backward_hook(output)
+[rank0]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - Peak FLOPS used for computing MFU: 9.890e+14
+[rank0]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - CUDA memory usage for model: 0.03GiB(0.02%)
+[rank0]:[titan] 2026-10-26 00:00:31,843 - torchtitan.trainer - INFO - Trainer is initialized with 512 tokens per DP rank, 4096 tokens per train step, gradient accumulation steps 4, maximum context length 512, total steps 10 (warmup 2)
+[rank0]:[titan] 2026-10-26 00:00:31,844 - torchtitan.components.checkpointer.base - INFO - Loading the checkpoint from /home/m3/runs/m4d/seed/step-0.
+[rank1]:[titan] 2026-10-26 00:00:32,186 - torchtitan.tools.garbage_collector - INFO - [GC] GC collection for checkpoint loading. took 0.01 seconds
+[rank0]:[titan] 2026-10-26 00:00:32,186 - torchtitan.tools.garbage_collector - INFO - [GC] GC collection for checkpoint loading. took 0.01 seconds
+[rank0]:[titan] 2026-10-26 00:00:32,186 - torchtitan.components.checkpointer.base - INFO - Finished loading the checkpoint in 0.34 seconds.
+[rank0]:[titan] 2026-10-26 00:00:32,186 - torchtitan.trainer - INFO - Training starts at step 1
+[rank1]:[titan] 2026-10-26 00:00:32,187 - torchtitan.components.checkpointer.base - INFO - Finished loading the checkpoint in 0.34 seconds.
+[rank1]:[titan] 2026-10-26 00:00:32,187 - torchtitan.trainer - INFO - Training starts at step 1
+[rank0]:[titan] 2026-10-26 00:00:38,289 - torchtitan.observability.metrics - INFO - [31mstep:  1  [32mloss:  8.02252  [38;2;180;60;0mgrad_norm:  1.7602  [38;2;54;234;195mmemory:  0.22GiB(0.16%)  [34mtps: 336  [36mtflops: 0.01  [35mmfu: 0.00%[39m
+[rank0]:[titan] 2026-10-26 00:00:38,289 - torchtitan.distributed.utils - INFO - Synchronizing and adjusting timeout for all ProcessGroups to 0:01:40
+[rank1]:[titan] 2026-10-26 00:00:38,289 - torchtitan.observability.metrics - INFO - [31mstep:  1  [32mloss:  8.02252  [38;2;180;60;0mgrad_norm:  1.7602  [38;2;54;234;195mmemory:  0.21GiB(0.15%)  [34mtps: 336  [36mtflops: 0.01  [35mmfu: 0.00%[39m
+[rank1]:[titan] 2026-10-26 00:00:38,289 - torchtitan.distributed.utils - INFO - Synchronizing and adjusting timeout for all ProcessGroups to 0:01:40
+[rank1]:[titan] 2026-10-26 00:00:39,388 - torchtitan.observability.metrics - INFO - [31mstep:  2  [32mloss:  7.44855  [38;2;180;60;0mgrad_norm:  1.6409  [38;2;54;234;195mmemory:  0.25GiB(0.18%)  [34mtps: 1,865  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:39,388 - torchtitan.observability.metrics - INFO - [31mstep:  2  [32mloss:  7.44855  [38;2;180;60;0mgrad_norm:  1.6409  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,865  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:40,456 - torchtitan.observability.metrics - INFO - [31mstep:  3  [32mloss:  6.00409  [38;2;180;60;0mgrad_norm:  2.4548  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,919  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:40,456 - torchtitan.observability.metrics - INFO - [31mstep:  3  [32mloss:  6.00409  [38;2;180;60;0mgrad_norm:  2.4548  [38;2;54;234;195mmemory:  0.25GiB(0.18%)  [34mtps: 1,919  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:41,534 - torchtitan.observability.metrics - INFO - [31mstep:  4  [32mloss:  4.95994  [38;2;180;60;0mgrad_norm:  2.2972  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,901  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:41,534 - torchtitan.observability.metrics - INFO - [31mstep:  4  [32mloss:  4.95994  [38;2;180;60;0mgrad_norm:  2.2972  [38;2;54;234;195mmemory:  0.25GiB(0.18%)  [34mtps: 1,901  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:42,602 - torchtitan.observability.metrics - INFO - [31mstep:  5  [32mloss:  4.53631  [38;2;180;60;0mgrad_norm:  1.8972  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,919  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:42,602 - torchtitan.observability.metrics - INFO - [31mstep:  5  [32mloss:  4.53631  [38;2;180;60;0mgrad_norm:  1.8972  [38;2;54;234;195mmemory:  0.25GiB(0.18%)  [34mtps: 1,919  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:43,673 - torchtitan.observability.metrics - INFO - [31mstep:  6  [32mloss:  4.04391  [38;2;180;60;0mgrad_norm:  1.8898  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,912  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:43,673 - torchtitan.observability.metrics - INFO - [31mstep:  6  [32mloss:  4.04391  [38;2;180;60;0mgrad_norm:  1.8898  [38;2;54;234;195mmemory:  0.25GiB(0.18%)  [34mtps: 1,912  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:44,756 - torchtitan.observability.metrics - INFO - [31mstep:  7  [32mloss:  3.88636  [38;2;180;60;0mgrad_norm:  1.8108  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,892  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:44,757 - torchtitan.observability.metrics - INFO - [31mstep:  7  [32mloss:  3.88636  [38;2;180;60;0mgrad_norm:  1.8108  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,892  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:45,815 - torchtitan.observability.metrics - INFO - [31mstep:  8  [32mloss:  3.78699  [38;2;180;60;0mgrad_norm:  1.6492  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,935  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:45,815 - torchtitan.observability.metrics - INFO - [31mstep:  8  [32mloss:  3.78699  [38;2;180;60;0mgrad_norm:  1.6492  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,935  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:46,871 - torchtitan.observability.metrics - INFO - [31mstep:  9  [32mloss:  3.73382  [38;2;180;60;0mgrad_norm:  1.5013  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,940  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:46,871 - torchtitan.observability.metrics - INFO - [31mstep:  9  [32mloss:  3.73382  [38;2;180;60;0mgrad_norm:  1.5013  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,940  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:47,928 - torchtitan.observability.metrics - INFO - [31mstep: 10  [32mloss:  3.79050  [38;2;180;60;0mgrad_norm:  1.3648  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,939  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank0]:[titan] 2026-10-26 00:00:47,928 - torchtitan.components.checkpointer.dcp - INFO - Saving the checkpointer.
+[rank0]:[titan] 2026-10-26 00:00:47,931 - torchtitan.components.checkpointer.dcp - INFO - Saving a model only checkpoint in torch.float32 at last step, step 10.
+[rank1]:[titan] 2026-10-26 00:00:47,928 - torchtitan.observability.metrics - INFO - [31mstep: 10  [32mloss:  3.79050  [38;2;180;60;0mgrad_norm:  1.3648  [38;2;54;234;195mmemory:  0.26GiB(0.19%)  [34mtps: 1,939  [36mtflops: 0.07  [35mmfu: 0.01%[39m
+[rank1]:[titan] 2026-10-26 00:00:47,928 - torchtitan.components.checkpointer.dcp - INFO - Saving the checkpointer.
+[rank1]:[titan] 2026-10-26 00:00:47,931 - torchtitan.components.checkpointer.dcp - INFO - Saving a model only checkpoint in torch.float32 at last step, step 10.
+[rank0]:[titan] 2026-10-26 00:00:48,082 - torchtitan.tools.garbage_collector - INFO - [GC] GC collection invoked by checkpointer. took 0.04 seconds
+[rank0]:[titan] 2026-10-26 00:00:48,082 - torchtitan.components.checkpointer.dcp - INFO - Last step checkpoint completed in 0.15s
+[rank0]:[titan] 2026-10-26 00:00:48,082 - torchtitan.trainer - INFO - Sleeping 2 seconds for other ranks to complete
+[rank1]:[titan] 2026-10-26 00:00:48,081 - torchtitan.tools.garbage_collector - INFO - [GC] GC collection invoked by checkpointer. took 0.03 seconds
+[rank1]:[titan] 2026-10-26 00:00:48,082 - torchtitan.components.checkpointer.dcp - INFO - Last step checkpoint completed in 0.15s
+[rank1]:[titan] 2026-10-26 00:00:48,082 - torchtitan.trainer - INFO - Training completed
+[rank1]:[titan] 2026-10-26 00:00:48,083 - torchtitan.components.checkpointer.base - INFO - Destroying the purge thread.
+[rank0]:[titan] 2026-10-26 00:00:50,083 - torchtitan.trainer - INFO - Training completed
+[rank0]:[titan] 2026-10-26 00:00:50,084 - torchtitan.components.checkpointer.base - INFO - Destroying the purge thread.
+[rank0]:[titan] 2026-10-26 00:00:50,632 - __main__ - INFO - Process group destroyed
+[rank1]:[titan] 2026-10-26 00:00:50,664 - __main__ - INFO - Process group destroyed

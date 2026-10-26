@@ -1,0 +1,5 @@
+23:48:27 chain start
+23:50:16 setup ok: torch==2.16.0.dev20261024+cu130 torchvision==0.30.0.dev20261024+cu130 
+23:53:40 hsdp: 23:53:40 HSDP_DONE
+00:19:22 m4d: 00:19:22 M4D_DONE
+00:19:27 CHAIN_DONE

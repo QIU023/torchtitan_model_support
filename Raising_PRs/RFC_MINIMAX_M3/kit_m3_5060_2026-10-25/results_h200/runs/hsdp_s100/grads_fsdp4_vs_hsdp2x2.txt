@@ -1,0 +1,13 @@
+126/159 parameters bitwise equal; worst group relative L2 difference 5.22e-08
+  layers.N.feed_forward.router.gate                            params=  7 rel_l2=5.22e-08 sign_flips=0/14336 bitwise=0/7
+  lm_head                                                      params=  1 rel_l2=4.56e-08 sign_flips=0/524288 bitwise=0/1
+  layers.N.attention.qkv_linear.wqkv                           params=  8 rel_l2=1.34e-10 sign_flips=0/1048576 bitwise=3/8
+  layers.N.attention.indexer.wk                                params=  7 rel_l2=1.23e-10 sign_flips=0/57344 bitwise=6/7
+  layers.N.feed_forward.routed_experts.w2                      params=  7 rel_l2=9.74e-11 sign_flips=0/1835008 bitwise=2/7
+  layers.N.feed_forward.shared_experts.w13                     params=  7 rel_l2=5.60e-11 sign_flips=0/458752 bitwise=5/7
+  layers.N.attention.wo                                        params=  8 rel_l2=4.67e-11 sign_flips=0/524288 bitwise=6/8
+  layers.N.feed_forward.routed_experts.w13                     params=  7 rel_l2=4.60e-11 sign_flips=0/3670016 bitwise=0/7
+  layers.N.attention.indexer.wq                                params=  7 rel_l2=2.93e-11 sign_flips=0/229376 bitwise=4/7
+  tok_embeddings                                               params=  1 rel_l2=0.00e+00 sign_flips=0/524288 bitwise=1/1
+  layers.N.attention.q_norm                                    params=  8 rel_l2=0.00e+00 sign_flips=0/256 bitwise=8/8
+  layers.N.attention.k_norm                                    params=  8 rel_l2=0.00e+00 sign_flips=0/256 bitwise=8/8

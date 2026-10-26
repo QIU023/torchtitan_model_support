@@ -1,0 +1,13 @@
+159/159 parameters bitwise equal; worst group relative L2 difference 0.00e+00
+  tok_embeddings                                               params=  1 rel_l2=0.00e+00 sign_flips=0/524288 bitwise=1/1
+  layers.N.attention.qkv_linear.wqkv                           params=  8 rel_l2=0.00e+00 sign_flips=0/1048576 bitwise=8/8
+  layers.N.attention.wo                                        params=  8 rel_l2=0.00e+00 sign_flips=0/524288 bitwise=8/8
+  layers.N.attention.q_norm                                    params=  8 rel_l2=0.00e+00 sign_flips=0/256 bitwise=8/8
+  layers.N.attention.k_norm                                    params=  8 rel_l2=0.00e+00 sign_flips=0/256 bitwise=8/8
+  layers.N.feed_forward.w13                                    params=  1 rel_l2=0.00e+00 sign_flips=0/262144 bitwise=1/1
+  layers.N.feed_forward.w2                                     params=  1 rel_l2=0.00e+00 sign_flips=0/131072 bitwise=1/1
+  layers.N.attention_norm                                      params=  8 rel_l2=0.00e+00 sign_flips=0/2048 bitwise=8/8
+  layers.N.ffn_norm                                            params=  8 rel_l2=0.00e+00 sign_flips=0/2048 bitwise=8/8
+  layers.N.attention.indexer.wq                                params=  7 rel_l2=0.00e+00 sign_flips=0/229376 bitwise=7/7
+  layers.N.attention.indexer.wk                                params=  7 rel_l2=0.00e+00 sign_flips=0/57344 bitwise=7/7
+  layers.N.attention.indexer.q_norm                            params=  7 rel_l2=0.00e+00 sign_flips=0/224 bitwise=7/7
