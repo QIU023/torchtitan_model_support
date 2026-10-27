@@ -103,3 +103,61 @@
 - 代码逐行看了 `minimax_m3/attention.py` 全文、`model.py` 和 `vision_encoder.py` 的相关部分。
   - 用脚本统计了注释和 docstring 的密度，列了私有 `def`，查了 logbook 路径、hook、全局状态、换 `__class__`，都没有问题。
   - 私有 `def` 里，`_apply_vision_rope` 是手写的部分旋转。同一个分支的 P2 已经让 `RoPE.forward` 支持部分旋转，评审可能会问为什么视觉这里不用；视觉塔走的是 common block 的 `rope_apply` 回调，P2 只改了模块的 `forward`，没改静态的 `apply_rotary_emb`。
+
+## 第二次审核（2026-10-26，CPU 会话）
+
+用户："重新拉取，审核Minimax M3 FSDP2基线body和diff，以及4D body和diff"。
+
+对象：
+- 基线：`minimax_m3` = `9a5ab9ebe`；正文是 `PR_BODIES_M3_FSDP_2026-10-24.md` 的 M3 粘贴区，数字来自 4 x H100 NVL。
+- 4D：`minimax_m3_5d` = `89fc094d1`，已开成 #5619（draft，线上 body 是 10-25 的短版）。文件里的粘贴区已经扩成 4 张表（8 x RTX 5060 Ti），还没贴上去。
+
+### 开基线 PR 之前要做
+
+1. **和 main 冲突：**
+   - main 10-27 合了 #5583（Tied RoPE cache），在 `models/common/decoder.py` 加了一行 `RoPE` 的 import，和 P1b 加 `OffsetRMSNorm` import 的位置冲突。两个分支都这样。
+   - 冲突本身只要两行都留。#5583 会让参数相同的 RoPE 共用一份 cache；M3 的 indexer 用的就是注意力自己的 RoPE，所以会被共享，按 #5583 的说法数值不变。
+   - rebase 后要重跑：CPU 全量（main 新加了 `test_rope_cache_tying.py`）、M3 的 GPU 单测、集成格子；再用一次运行确认对拍表和 HSDP 表的第 1 步没变。
+   - 推送规则：`minimax_m3_5d` 现在是 #5619 的 PR 分支，按 CLAUDE.md 要先推 review 分支、用户点头后再同步，而新开 review 分支要先问用户。`minimax_m3` 还没有 PR，备份后直接 force-push 即可。
+2. **4D 正文（文件版）第一段过时了：**
+   - 现在写的是 "which open as their own PRs once the full parallelism matrix has run"，但矩阵已经跑完；
+   - 基线也已改成一个 PR，"PRs" 要改成单数；
+   - 基线开了以后，换成它的编号。
+3. **4D 正文 PP 那条只写了一半：**
+   - 现在只写了动态形状这一个原因；
+   - 10-24 的定位里，两边都用静态形状之后，还剩 46 个 dense 投影权重的梯度不逐位，原因是 PP 用另一种顺序累加各个 micro-batch 的 bf16 梯度，未改动的 DeepSeek V3 也一样（`M3_5D_2026-10-24.md`）；
+   - 按数值验收规则，差距要整个定位，所以补一条。
+4. **4D 正文 TP 那句因果写反了：**
+   - 原句 "TP layouts differ from step 1 through the MSA block selections and expert choices"；
+   - 最早的差异其实来自 row-parallel 规约的顺序，它改变了舍入，进而翻转了一部分选块和路由。下面那条 bullet 也是这么说的：强制选择后还剩 5.4e-3，那就是规约顺序。
+   - 建议改成先说规约顺序、再说翻转。
+
+### 建议改
+
+5. **基线 Results 那句 "HSDP matches FSDP bitwise through step 3"：**
+   - 下面紧接着说第 1 步梯度有 33 个参数不同；
+   - 建议写成 "HSDP's loss and grad norm match FSDP's bitwise through step 3"，免得读成矛盾。
+6. **4D 表后面几步漂移很大：**
+   - 第 50 步 grad norm 最多差 22%（ep2 x fsdp2），但每张表的 noise floor 只是同一个格子跑两次（全同），没有"同一份数据、换一种规约顺序"的那种底。
+   - #4312 的教训是评审会把后面几步的差读成 bug。
+   - 可以加一句，指向基线 PR 的 HSDP 那行作为规约顺序的量级（第 50 步 grad norm -3.43%）；或者把 4D 表收成只报第 1、10 步。
+   - draft 不急，转正式前要定。
+
+### 代码层面评审可能会问（不挡开 PR）
+
+- P2 按宽度隐式触发部分旋转（`query.shape[-1] > self.config.dim`）：原来宽度不对会直接报错，现在会静默地只转前 `dim` 个通道。评审可能更想要显式的配置或断言。
+- `MiniMaxM3StateDictAdapter` 继承 DeepSeek V3 的 adapter，`super().__init__` 上要加 `pyrefly: ignore[bad-argument-type]`。先例是 DeepSeek V4 和 Kimi K2.7 也继承它，所以说得过去。
+- P4 移进 common 的 `transformer_block_sharding_config`，和 Muse Spark 自己的一个同名函数内容不同。
+- `_apply_vision_rope` 手写了部分旋转，而同一个 PR 的 P2 让 `RoPE.forward` 支持部分旋转（上一轮已记）。
+- 对拍脚本 602 行，GLM-5 的是 276 行。`--force-hf-*` 那些诊断功能可以删。
+
+### 核对无误的
+
+- 代码：
+  - 4 个 prep 提交逐行看了（P2 的 `_partial_forward` 就是 Qwen3.5 原来的 `_partial_rope` 挪进 `RoPE`，编译区名字不变；P3 只加了 `_build_from_hf_map` 和 `hf_rope_config_cls` 两个 seam）；
+  - `model.py`、`attention.py`、`vision_encoder.py`、`state_dict_adapter.py` 全文看了：都用 common 的多模态工具和 dummy 视觉前向，没有 hook，没有全局状态，也没有换 `__class__`。
+- 测试：CPU 测试覆盖选块和 KL 对参考实现、dense 模式、flavor、发布 checkpoint 的参数量；GPU 测试覆盖稀疏 flex 对 SDPA、KL 梯度只进 indexer。对拍脚本固定 revision `f0e1c1e`，默认 bf16。
+- 正文：
+  - 两份都没有 we/our/us，没有破折号，全部是 ASCII；基线正文 1004 词，4D 597 词（都不算表格）；
+  - 4D 表里一共 29 种布局，和正文说的一致；
+  - kit 链接指向的 logbook 仓库是公开的，链接能打开。
