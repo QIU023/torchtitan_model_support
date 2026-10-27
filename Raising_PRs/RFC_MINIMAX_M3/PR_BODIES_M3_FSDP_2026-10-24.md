@@ -2,6 +2,12 @@
 
 ## 状态（不粘贴）
 
+- **10-26 CPU 会话核对 rebase（用户："拉取"）：**
+  - fork 上 `minimax_m3` = `a7db544ff`，backup 分支在。`git range-diff` 看，5 个提交里只有 P1b 不同，差的只是 import 块上下文里多出的 `rope` 那一行。
+  - upstream main 已经到 `13806cbae`，多出的只有 #5634（只改 `qwen3/flavors.py`），合并没有冲突，可以直接开 PR。
+  - 标题跟着 #5619 线上用户改的写法，换成 `[MiniMax M3]`。
+  - Changes outside 最后一条原来写 "`test_model_defaults_to_varlen` skips it"，但 M3 其实是从参数化列表里去掉的，和 DeepSeek V4、Kimi K2.7 一样，跳过数不会多 1（main 和分支都是 18）。所以改成 "leaves it out, as it does DeepSeek V4 and Kimi K2.7"。
+
 - **10-26 晚（太平洋时间）rebase 到 upstream main `e111f10d4`（#5583 Tied RoPE cache）：** `minimax_m3` = `a7db544ff`（P1 `0e146e96a`、P2 `1b733eba3`、P3 `a1a1ef432`、P1b `848102e45`、M3 `a7db544ff`），已推到 fork：先把旧 head `9a5ab9ebe` 推成 `backup/minimax_m3_pre_20261026`，再 force-with-lease（用户这次的指示：这个分支还没有 PR）。
   - 冲突只在 `torchtitan/models/common/decoder.py` 的 import 块（P1b 应用时）：#5583 加的 `rope` import 和 P1b 加的 `norm` import 两行都留，按模块名排序。rerere 关着，只改了冲突段。
   - 核对：8 个提交里 7 个 patch-id 相同；P1b 的 patch-id 不同（上下文里多了 `rope` 那行），24 行增删行逐行相同；提交信息和作者都没变。两棵新树改动过的 .py 文件跑 pyflakes，没有未定义的名字。
@@ -107,7 +113,7 @@
 
 ## M3 PR
 
-标题：`[minimax_m3] add MiniMax M3 with MiniMax Sparse Attention on FSDP2`
+标题：`[MiniMax M3] add MiniMax M3 with MiniMax Sparse Attention on FSDP2`
 
 --- PASTE BEGIN ---
 ## Summary
@@ -146,7 +152,7 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
   - Qwen3.5 debug recipes, deterministic, 10 steps on one warmed compile cache: identical loss on every step before and after, dense on 1 GPU and MoE at tp 2 x pp 2 x ep 2 on 4 GPUs.
 - `models/deepseek_v3/state_dict_adapter.py`: the HF key map comes from an overridable `_build_from_hf_map(model_config)` and the RoPE check from `hf_rope_config_cls`; DeepSeek V3, V4 and Kimi K2.7 keep both.
 - `models/common/decoder.py`, `attention/attention.py` and `config_utils.py`: `Decoder.Config.norm`, `GQAttention.Config.qk_norm` and `make_gqa_config(qk_norm=...)` accept `OffsetRMSNorm.Config`; only the field types change, and the eleven `bad-argument-type` ignores in Qwen3.5 and Qwen3.8 go away.
-- Tests and README: MiniMax M3 joins the shared CPU tests' model lists (`test_model_defaults_to_varlen` skips it, since MSA runs on flex), the adapter tests and the README's model table.
+- Tests and README: MiniMax M3 joins the shared CPU tests' model lists (`test_model_defaults_to_varlen` leaves it out, as it does DeepSeek V4 and Kimi K2.7, since MSA runs on flex), the adapter tests and the README's model table.
 
 ## Test plan
 - `pytest tests/unit_tests/cpu` (`1970 passed, 18 skipped, 3 xfailed, 1 failed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
