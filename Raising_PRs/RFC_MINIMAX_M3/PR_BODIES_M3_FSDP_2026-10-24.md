@@ -2,6 +2,8 @@
 
 ## 状态（不粘贴）
 
+- **10-26 CPU 会话按第二次审核改（用户："全部都改"）：** Results 那句改成 "HSDP's loss and grad norm match FSDP's bitwise through step 3"，因为下面一条说第 1 步有 33 个参数的梯度不同，原句读起来像矛盾。粘贴区别的地方没动。rebase 到 main（#5583 的冲突）和重跑见 `REVIEW_M3_PRS_2026-10-25.md` 第二次审核第 1 条，要 GPU 会话做。
+
 - **10-26 H100（`root@87.116.91.146 -p 11468`，4 x H100 NVL 95 GB，driver 595.91 / CUDA 13.2，torch 2.16.0.dev20261024+cu130）：正文里每个数字现在都来自这台机器。**
   - 用户："本机重新改写2个body，FSDP2基线和4D body，不需要出现H200之外的数据"。H200 释放后改成："FSDP2里面的表重新来一遍"，以及"4D全部数值只用5060，FSDP2基线现在去跑"。
   - kit 在 `kit_m3_5060_2026-10-25/h100/`（README 里写了运行顺序），结果在 `results_h100/runs/`；正文链接钉在 logbook 提交 `b8492e78`。
@@ -154,7 +156,7 @@ The parity test reduces the released HF config to `debugmodel`, loads the TorchT
 
 4 x H100 NVL, debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps; every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed. fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor. Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h100/run_hsdp_h100.sh).
 
-HSDP matches FSDP bitwise through step 3 and parts from the grad norm at step 4, because its reduction adds the ranks' gradients in a different order.
+HSDP's loss and grad norm match FSDP's bitwise through step 3, and the grad norm parts at step 4, because HSDP adds the ranks' gradients in a different order.
 
 | cell | loss, step 1 | step 10 | step 50 | step 100 | grad norm, step 1 | step 10 | step 50 | step 100 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
