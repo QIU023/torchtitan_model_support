@@ -12,7 +12,10 @@
     - 5D 树 bf16 对拍（不强制和强制 HF 选择两种）：新旧逐字相同，也和 4D 正文引用的 10-26 那次逐字相同。
     - CPU 全量（一遍接一遍）：新 main 1946 passed / 18 skipped / 3 xfailed / 1 failed；基线 1970 / 18 / 3 / 1；5D 1972 / 18 / 3 / 1。只在分支上失败的都是 0，唯一的失败是三棵树都有的 `test_lora_head_only_matches_cross_entropy`（5060 上的 NaN 测试）。main 新加的 `test_rope_cache_tying.py` 4 个测试三棵树都过。
     - GPU 单测：两棵新树都是 2 passed。集成格子 `minimax_m3_mm_fsdp` 和 `minimax_m3_mm_fsdp+tp+sp+ep` 都通过。这两个格子的 recipe 不固定 seed（`seed` 默认 None），同一棵新树上 4D 格子跑两次，第 1 步分别是 8.16710 和 8.03160，所以拿它们的 loss 和之前比没有意义。
-  - 粘贴区的 CPU 计数还没有换：正文现在每个数都是 H100 的，新 main 上的计数只有 5060 的（基线 1970 passed，外加 5060 上两边都失败的 NaN 测试）。写 5060 的数，还是再开一台 H100 重跑，等用户决定。
+  - 粘贴区的 CPU 计数换成了 5060 在新 main 上的数（用户："如果是的话 写5060就行"，前提是计数变化来自新加的测试）：1970 passed / 18 skipped / 3 xfailed / 1 failed。
+    - 比 H100 的旧数 1931 多出的，是新 main 加的 40 个测试：`models/common` 17、`test_varlen_cp` 8、`test_cp_attention` 5、`test_rope_cache_tying` 4、`tools` 4、CP 配置校验 1、`download_hf_assets` 1，一个都没少。
+    - 少的那 1 个是 5060 上的 NaN 测试。这台的 CPU（AMD EPYC 7502，Zen 2，没有 AVX-512）上，debug 模型的 CPU 前向直接得到全 NaN 的隐状态，新旧 main 上都一样，在 H100 那台上是通过的。没有再往下查原因。
+    - 这是基线正文里唯一不是 H100 的数，Test plan 那一行写明了 main 上同样失败。
 
 - **10-26 CPU 会话按第二次审核改（用户："全部都改"）：** Results 那句改成 "HSDP's loss and grad norm match FSDP's bitwise through step 3"，因为下面一条说第 1 步有 33 个参数的梯度不同，原句读起来像矛盾。粘贴区别的地方没动。rebase 到 main（#5583 的冲突）和重跑见 `REVIEW_M3_PRS_2026-10-25.md` 第二次审核第 1 条，要 GPU 会话做。
 
@@ -146,7 +149,8 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
 - Tests and README: MiniMax M3 joins the shared CPU tests' model lists (`test_model_defaults_to_varlen` skips it, since MSA runs on flex), the adapter tests and the README's model table.
 
 ## Test plan
-- `pytest tests/unit_tests/cpu` (`1931 passed, 18 skipped, 3 xfailed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
+- `pytest tests/unit_tests/cpu` (`1970 passed, 18 skipped, 3 xfailed, 1 failed`), including the 16 MiniMax M3 tests and the 2 MiniMax M3 adapter tests.
+  - The one failure, `test_loss.py::TestChunkedLossWrapper::test_lora_head_only_matches_cross_entropy` (NaN against NaN), fails the same way on main `e111f10d4` with the same torch nightly, 2.16.0.dev20261024 (`1946 passed, 18 skipped, 3 xfailed, 1 failed`).
 - `pytest tests/unit_tests/gpu/models/minimax_m3 -q` (`2 passed`)
 - `python -m tests.integration_tests.run_tests <out> --test_suite models --test_name minimax_m3_mm_fsdp --ngpu 4` (`passed`, 10 steps)
 - `python -m scripts.checkpoint_conversion.numerical_tests_minimax_m3`, with `--force-hf-blocks --force-hf-routing` and with `--dtype float32 --attn_backend flex` (first table below)
