@@ -2,6 +2,8 @@
 
 ## 状态（不粘贴）
 
+- **10-26 删掉文件末尾三份不再使用的 prep 正文（用户："删了 太confuse了"）：** 原文在 logbook 提交 `2e974a88` 的这个文件里。文件里现在只有 `## M3 PR` 一份粘贴区。
+
 - **10-26 CPU 会话核对 rebase（用户："拉取"）：**
   - fork 上 `minimax_m3` = `a7db544ff`，backup 分支在。`git range-diff` 看，5 个提交里只有 P1b 不同，差的只是 import 块上下文里多出的 `rope` 那一行。
   - upstream main 已经到 `13806cbae`，多出的只有 #5634（只改 `qwen3/flavors.py`），合并没有冲突，可以直接开 PR。
@@ -55,11 +57,11 @@
   - goal 原文要给这份正文加一张 dp4 的表，但用户 10-25 定了正文里写 "Pending (H100)."，所以没加。可以直接贴的 dp4 表（fsdp4、fsdp4 again、HSDP 2 x 2 等）在 `M3_4D_TABLES_EN_2026-10-25.md`。
 - **10-25（goal：两个 PR 达到 #4025 的合入标准，见 `GOAL_PR_READY_2026-10-25.md`；5060 会话）：**
   - 只开两个 PR：四个 prep 提交留在基线里。
-    - 正文照 #4025 加了 "Changes outside `models/minimax_m3/`"，每个 prep 提交一条，内容取自下面三份旧 prep 正文；
+    - 正文照 #4025 加了 "Changes outside `models/minimax_m3/`"，每个 prep 提交一条，内容取自三份旧 prep 正文（10-26 已从本文件删掉，原文在 logbook 提交 `2e974a88`）；
     - P2 那条带上 Qwen3.5 前后每步 loss 相同的检查；
     - 最后一条是 M3 提交本身在共享测试和 README 里的登记。
     - Summary 里的 `#<P1>` / `#<P2>` / `#<P3>` 换成一句"前四个提交是共享代码的准备"。
-    - 下面三份 prep 正文不再使用，留作出处。
+    - 三份 prep 正文不再使用。10-26 用户觉得留在文件里容易混淆，已经删掉；原文在 logbook 提交 `2e974a88` 的这个文件里。
   - 第 1 条 HSDP：本机 5060 上测完并定位，细节见 `CHECKS_2026-10-25.md`。
     - 第 1、2 步 loss 和 grad norm 都逐位；
     - fsdp4 跑两次，10 步全同；
@@ -198,58 +200,4 @@ HSDP's loss and grad norm match FSDP's bitwise through step 3, and the grad norm
   - each sparse layer's KL takes one `nonzero().tolist()` and one host-to-device index copy per query tile;
   - fused selection and KL kernels are follow-up work.
 - Only debug recipes are registered, and the adapter does not load the released NVFP4 and MXFP8 M3.1-Flash weights.
---- PASTE END ---
-
----
-
-以下三份是 10-24 准备单独开 prep PR 时写的正文。10-25 决定只开两个 PR，prep 提交留在基线里，这三份不再粘贴，只作为上面 "Changes outside" 的出处。
-
-## P1 + P1b PR（不再使用）
-
-标题：`[models] move OffsetRMSNorm to models/common and accept it where RMSNorm configs are taken`
-
---- PASTE BEGIN ---
-## Summary
-Move `OffsetRMSNorm` (the float32 `(1 + weight) * norm(x)` RMSNorm) from `qwen3_5/model.py` to `models/common/norm.py`, and let `Decoder.Config.norm`, `GQAttention.Config.qk_norm` and `make_gqa_config(qk_norm=...)` take it.
-- The class body is unchanged; Qwen3.5's model and flavors import it from `models/common`, and its GPU test moves to `tests/unit_tests/gpu/models/common`.
-- The three config fields were typed `RMSNorm.Config`, so Qwen3.5 carried ten `bad-argument-type` ignores and Qwen3.8 one; they are removed.
-- The field types are the only change; nothing changes at runtime.
-- MiniMax M3 uses the same norm for its decoder, QK and indexer norms.
-
-## Test plan
-- `pytest tests/unit_tests/cpu/models/qwen3_5 tests/unit_tests/cpu/models/qwen3_8 tests/unit_tests/cpu/models/qwen3_6 tests/unit_tests/cpu/models/test_build_model_config.py -q` (`passed`)
-- `pytest tests/unit_tests/gpu/models/common/test_offset_rmsnorm.py -q` (`passed`)
-- Scoped pre-commit checks, including formatting, lint, and Pyrefly (`passed`)
---- PASTE END ---
-
-## P2 PR（不再使用）
-
-标题：`[rope] rotate the first dim channels of wider inputs`
-
---- PASTE BEGIN ---
-## Summary
-`RoPE.forward` applies partial RoPE itself: when the query and key are wider than the module's `dim`, their first `dim` channels rotate and the rest pass through, inside the existing `partial_rope` compile region.
-- Qwen3.5 did this in `Qwen35Attention._partial_rope` with a `rotary_dim` field that always equalled its rope's `dim`, under a TODO to move it into the rope; the attention now calls its rope directly, and `rotary_dim` leaves `Qwen35Attention.Config` and the Qwen3.5 layer builders.
-- Any `GQAttention` whose rope `dim` is smaller than its `head_dim` gets partial RoPE the same way (MiniMax M3 rotates 64 of 128 channels).
-
-## Test plan
-- `pytest tests/unit_tests/cpu/models/common/test_rope.py -q` (`passed`, adds `TestPartialRoPE`)
-- Qwen3.5 debug recipes, CUDA graphs off, deterministic, 10 steps, one warmed inductor cache: the loss is identical on every step before and after, for the dense model on 1 GPU and the MoE model at dp_shard 2 x tp 2 x pp 2 on 8 GPUs; main run twice on the MoE model is identical too.
-- Scoped pre-commit checks, including formatting, lint, and Pyrefly (`passed`)
---- PASTE END ---
-
-## P3 PR（不再使用）
-
-标题：`[deepseek_v3] let state dict adapter subclasses supply the key map and RoPE type`
-
---- PASTE BEGIN ---
-## Summary
-`DeepSeekV3StateDictAdapter` builds its HF key map in an overridable `_build_from_hf_map(model_config)` and validates the RoPE type named by `hf_rope_config_cls`, so another decoder can reuse its per-expert conversion.
-- Its per-expert conversion (split grouped experts into HF expert weights, stack them back on load, online and offline) is the only one in the tree that takes the HF expert key from a class attribute, but `__init__` read the MLA key map from `model_config.layers[0].attention` and `from_hf` checked `ComplexRoPE`.
-- DeepSeek V3, V4 and Kimi K2.7 keep the same map and the same check; MiniMax M3 overrides both.
-
-## Test plan
-- `pytest tests/unit_tests/cpu/models/test_state_dict_adapter.py tests/unit_tests/cpu/models/test_mla_state_dict_adapter.py -q` (`passed`)
-- `pytest tests/unit_tests/cpu/models/deepseek_v3 tests/unit_tests/cpu/models/deepseek_v4 -q` (`passed`)
-- Scoped pre-commit checks, including formatting, lint, and Pyrefly (`passed`)
 --- PASTE END ---
