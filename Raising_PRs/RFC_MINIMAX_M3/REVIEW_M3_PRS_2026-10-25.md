@@ -161,3 +161,50 @@
   - 两份都没有 we/our/us，没有破折号，全部是 ASCII；基线正文 1004 词，4D 597 词（都不算表格）；
   - 4D 表里一共 29 种布局，和正文说的一致；
   - kit 链接指向的 logbook 仓库是公开的，链接能打开。
+
+## 第三次审核（2026-10-27，CPU 会话）
+
+用户："拉取 基线body删除了不用的版本，再次审核"。
+
+对象：
+- 基线 `minimax_m3` = `a7db544ff`，base `e111f10d4`。upstream main 现在是 `13806cbae`（只多了 #5634，改 `qwen3/flavors.py`），合并没有冲突。
+- 正文：`PR_BODIES_M3_FSDP_2026-10-24.md`，标题第 118 行，粘贴区第 120 到 203 行。
+
+### 开 PR 前要改
+
+1. **README 的对拍数字和正文不是同一次运行：**
+   - README（在 M3 提交里）写的是 10-24 A4000 那次的数：末 token KL 8.43e-6，选块 94.4%，路由 98.3%，强制 HF 选择后全位置 KL 4.10e-5（`PARITY_HF_2026-10-24.md` 表的前两行）。
+   - 正文 Results 第一张表是 10-26 H100 的数：1.50e-5、93.8%、97.9%、4.07e-5。
+   - 评审对照 diff 和正文，会看到同一个测试有两组数。README 应该引用正文那一次，四个数换成 H100 的。像素 4.8e-7 和视觉特征 6.1e-5 两次相同，不用改。
+   - 做法：amend M3 提交，先把 `a7db544ff` 推成 backup，再 force-with-lease `minimax_m3`（还没有 PR）。只改 README，不用重跑测试。
+   - 5D 分支的 README 也是旧数（3.40e-5 / 92.2% / 95.5% / 4.86e-5，视觉特征 1.2e-4，和 #5619 旧正文是同一次），但文件里的新 5D 正文写的是 5060 的 2.21e-5 / 4.74e-5。5D 是 draft，可以等下次同步 #5619 时一起改（走 review 分支）。
+
+### 建议改（可选）
+
+2. **fp32 两行的末 token KL 是负数**（-9.8e-7、-1.9e-7）：
+   - KL 本身不会是负的。这是 fp32 下两个分布几乎相同时的舍入，评审可能会问；
+   - 可以在 fp32 那条 bullet 里加半句，说明这个 KL 在舍入的量级，所以读出来略小于 0；或者表里改写成 "< 1e-6"。
+3. **"Pixels match to 4.8e-7." 没说比的是什么：**
+   - 脚本比的是 titan 和 HF 处理器各自预处理出来的 pixel values；
+   - 可以写成 "The image preprocessing matches HF's processor to 4.8e-7"，再把视觉特征（bf16 6.1e-5，fp32 1.2e-8）并进同一条。
+4. **Results 的两段设置说明各有两三句：**
+   - 按 10-07 的规则（"any other body or reply section that makes more than one point"），可以拆成 bullet；
+   - 但 #4312 那种 "一段说明加一张表" 的格式用户一直接受，这条由用户定。
+5. **README 的 "Indexer Warmup" 一节和 M3.1-Flash 那段还在**（第一次审核第 3 节第 5 条）：shuhuayu 在 #4025 说过 README 不列变体、不写怎么运行。可选。
+
+### 核对无误的
+
+- **正文：**
+  - 对拍表 4 行，和 H100 原始输出（`kit_m3_5060_2026-10-25/results_h100/runs/parity/*.txt`）逐个对上；
+  - "Changes outside" 里 P2 的检查：H100 上 dense 用 1 卡、MoE 用 tp2 x pp2 x ep2 4 卡，各自先预热，loss_compare 全等（`results_h100/runs/p2`）；
+  - "eleven `bad-argument-type` ignores"：P1b 正好删了 11 行；
+  - Test plan：16 + 2 个测试和 compare 文件对上；集成测试命令的参数名和 `run_tests.py` 一致；
+  - pre-commit 那条是 rebase 前跑的。rebase 只改了一行 import，而且 `import av` 上的 ignore 在 main `13806cbae` 上还在，所以 "as on main" 仍然成立。
+  - 数值表规则：参照 fsdp4 的 loss 在第 20 步左右进入 2.6 到 3.0 的平台，没有记住数据集的迹象，报第 50、100 步不违反规则；
+  - 没有 we/our/us，没有破折号，全部是 ASCII。
+- **代码：**
+  - `git range-diff` 看，只有 P1b 的 import 上下文不同；
+  - 第一次审核提的两处已经改了：docstring 和 README 都写了 "and their norms"；flex inductor 那句已经删掉。
+  - 新加的 10 处 pyrefly ignore 在 main 上都有同样的先例：`re.search(...).group(0)` 上的 `missing-attribute`（DSV3、flux 的 adapter），`forward` 的 `bad-override`，NamedTuple 字段的 `noqa: N815`（common 的 MoE）。
+  - diff 里没有 logbook 路径、硬件名或实验记录；纯注释行占新增行的 3.6%；唯一的 TODO 和 Qwen3.5 在 main 上的那句相同。
+  - 第二次审核"代码层面"那几条（P2 按宽度隐式触发、adapter 的 ignore、602 行的对拍脚本）没有变化，仍然不挡开 PR。
