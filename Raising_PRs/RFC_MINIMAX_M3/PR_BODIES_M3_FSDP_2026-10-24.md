@@ -2,6 +2,16 @@
 
 ## 状态（不粘贴）
 
+- **10-27 用户开了 #5635（`QIU023:minimax_m3` = `8a2651476`，base main `13806cbae`，+3370 / -103，34 个文件）：**
+  - 标题用的是 `[MiniMax M3] add MiniMax M3 baseline with FSDP2`；自动请了 fegin、wconstab、wwwjn、tianyu-l 评审。CI 在等维护者批准（`ciflow/rl`、`ciflow/fake-pg`），已经跑完的 3 项检查都通过。
+  - 线上正文就是这份粘贴区，另外多了用户手加的三行：Summary 下面一句 "Note: splited FSDP2/HSDP baseline from #5619"，以及 Current scope 里两条只缩进 1 格的子 bullet（缩进 1 格在 GitHub 上会渲染成顶层 bullet）。CPU 会话已经把这三行改通顺、改成缩进 2 格，写进下面的粘贴区。
+  - 用户问数值是否符合预期（和 #4025 比），CPU 会话的核对：
+    - 能直接对比的几项：bf16 末 token KL 1.50e-5，#4025 是 1.20e-5；bf16 路由一致率 97.9%，#4025 是 98.5%；fp32 末 token KL 绝对值 9.8e-7，#4025 是 6.76e-7。#4025 表头写的是 "|Logits KL|"，可见 K3 当时也遇到 fp32 下 KL 为负的情况，所以取了绝对值。
+    - 视觉：像素差 4.8e-7，#4025 是 1.2e-7；fp32 视觉特征差 1.2e-8，#4025 是 2.73e-3（M3 的脚本关了 HF Conv3d 默认开的 TF32）。
+    - #4025 没有的几项：全位置 KL、强制 HF 选择那两行、选块一致率。bf16 下选块只有 93.8% 一致，是最容易被问的一点，H100 的 `parity_diag/diag_blocks.txt` 已经定位：fp32 下 titan 的选块每层都等于用它自己的 index 分数重算的 top-k，HF 不一致的位置都是第 k 和第 k+1 块分数接近的地方（每层中位数 1e-3 到 8e-2，分数跨度约 10）。正文原来没有写这一点，粘贴区补了一条。
+    - 并行验证比 #4025 严：#4025 拿单卡、FSDP、HSDP 各跑 200 步，只给 loss 差的均值 -0.0004、标准差 0.0027，并且写明没有逐位比较；这里是同一条数据流上第 1 步 loss 逐位相同，梯度差定位到规约顺序，后几步 loss 的差（0.002 左右）和 #4025 的标准差同一量级。
+  - H100 的数（对拍、HSDP、diag）都是在 `9a5ab9ebe` 上测的。rebase 后在 5060 上核对过，`a7db544ff` 的对拍输出和 fsdp4 都和它逐位相同；`8a2651476` 只多改了 README，所以这些数对 PR head 仍然成立。
+
 - **10-27 CPU 会话按第三次审核改（用户："全改"）：**
   - README（在 M3 提交里）：对拍的四个数换成正文那次 H100 的（1.50e-5 / 93.8% / 97.9% / 4.07e-5）。删掉 "Indexer Warmup" 一节和 M3.1-Flash 那段，依据是 shuhuayu 08-14 在 #4025 说的"README 不列变体、不写怎么运行"。warmup 仍写在正文 Design 里，M3.1-Flash 权重的限制仍写在 Current scope 里。
   - 提交信息里也有旧数和旧说法，一起改了："last-token KL is 8.4e-6" 换成 1.5e-5，"trains only the index projections" 补上 "and their norms"。
@@ -124,10 +134,13 @@
 
 ## M3 PR
 
-标题：`[MiniMax M3] add MiniMax M3 with MiniMax Sparse Attention on FSDP2`
+标题：`[MiniMax M3] add MiniMax M3 baseline with FSDP2`（#5635 线上用的标题）
 
 --- PASTE BEGIN ---
 ## Summary
+
+Note: this FSDP2/HSDP baseline is split from the draft #5619.
+
 Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose decoder runs MiniMax Sparse Attention (MSA, https://arxiv.org/abs/2606.13392) in 57 of its 60 layers, as an eager model on FSDP2 and HSDP.
 - Add MSA to `torchtitan/models/minimax_m3/attention.py`: `MSAIndexer`, block selection, a flex `BlockMask` built from the selection, `MSAInnerAttention(FlexInnerAttention)` and `MiniMaxSparseAttention(GQAttention)`.
 - Add `MSAIndexerLoss(AuxLoss)` next to it, the KL loss that trains the indexer, injected on the attention output like the other auxiliary losses.
@@ -188,6 +201,9 @@ HF parity on one H100 NVL:
 
 - TorchTitan's image preprocessing matches HF's processor to a max difference of 4.8e-7, and the projected vision features match to 6.1e-5 in bf16 and 1.2e-8 in fp32.
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
+- Free selections differ where blocks nearly tie ([diag_blocks.txt](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/results_h100/runs/parity_diag/diag_blocks.txt)):
+  - in fp32, TorchTitan's selection equals a top-k recomputed from its own index scores in every layer;
+  - at HF's mismatches, the k-th and (k+1)-th block scores are a median of 1e-3 to 8e-2 apart, against a score spread of about 10.
 - The negative fp32 last-token KL values are rounding error around zero.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
 
@@ -211,6 +227,8 @@ HSDP's loss and grad norm match FSDP's bitwise through step 3, and the grad norm
 
 ## Current scope
 - Parallelism: FSDP2 and HSDP; TP, CP and EP raise `NotImplementedError`, and `supports_pipeline_parallel = False` refuses PP.
+  - TP/SP, EP and PP are in the draft #5619.
+  - CP needs further work in Attention Gym and on CP for DSA-style sparse attention, so #5619 leaves it out for now.
 - Inputs: text and images, packed or not; the vision tower splits videos into segments, but no test covers video yet.
 - Compile: the local compile regions (loss, fused activation, offset RMSNorm, partial RoPE, fp32 split) and flex attention; CUDA graphs stay off, since MSA syncs with the host inside the forward.
 - MSA's block selection and KL loss are PyTorch loops over 128-query tiles:
