@@ -1,0 +1,167 @@
+....................................................................................................................F....................s............................. [  8%]
+....................................................................................................................................................................... [ 16%]
+.......................................................s............................................................................................................... [ 25%]
+....................................................................................................................................................................... [ 33%]
+....................................................................................................................................................................... [ 41%]
+....................................................................................................................................................................... [ 50%]
+....................................................................................................................................................................... [ 58%]
+....................................................................................................................................................................... [ 67%]
+..................................................................................................................................s.................................... [ 75%]
+....................................................................................................xxx................................................................ [ 83%]
+....................................................................................................................................................................... [ 92%]
+.................................................................sssssssssssss.............................................................................             [100%]
+================================================================================== FAILURES ===================================================================================
+______________________________________________________ TestChunkedLossWrapper.test_lora_head_only_matches_cross_entropy _______________________________________________________
+
+self = <tests.unit_tests.cpu.components.test_loss.TestChunkedLossWrapper testMethod=test_lora_head_only_matches_cross_entropy>
+
+    def test_lora_head_only_matches_cross_entropy(self):
+        """The in-tree lm_head LoRA config preserves loss and adapter gradients."""
+        torch.manual_seed(42)
+        model_config = build_model_config(
+            "debugmodel", attn_backend="flex", parallelism=ParallelismConfig()
+        )
+        model_config = transform_model_config_(
+            model_config, [LoRATransform(rank=2, alpha=4.0, target_modules=["lm_head"])]
+        )
+        model = model_config.build()
+        model.init_states()
+        model._skip_lm_head = True
+        # A nonzero B matrix exercises gradients for both adapter matrices.
+        with torch.no_grad():
+            model.lm_head.lora_b.weight.normal_(std=0.02)
+        reference_head = copy.deepcopy(model.lm_head)
+        trainable_names = {
+            name for name, param in model.named_parameters() if param.requires_grad
+        }
+        self.assertEqual(
+            trainable_names, {"lm_head.lora_a.weight", "lm_head.lora_b.weight"}
+        )
+    
+        for num_chunks in (1, 2, 4):
+            with self.subTest(num_chunks=num_chunks):
+                model.zero_grad(set_to_none=True)
+                reference_head.zero_grad(set_to_none=True)
+                chunked_loss = ChunkedLossWrapper(
+                    ChunkedLossWrapper.Config(num_chunks=num_chunks)
+                )
+                chunked_loss.set_lm_head(model.lm_head)
+                for _ in range(2):
+                    tokens = torch.randint(0, model_config.vocab_size, (8,))
+                    positions = torch.arange(8)
+                    hidden_TD = model(
+                        tokens,
+                        positions=positions,
+                        attention_metadata=model._get_attention_metadata(positions),
+                    )
+                    self.assertFalse(hidden_TD.requires_grad)
+                    labels = torch.randint(0, model_config.vocab_size, (8,))
+                    labels[0] = IGNORE_INDEX
+                    token_count = (labels != IGNORE_INDEX).sum()
+                    reference_loss = (
+                        F.cross_entropy(
+                            reference_head(hidden_TD), labels, reduction="sum"
+                        )
+                        / token_count
+                    )
+    
+                    loss, _ = chunked_loss(hidden_TD, labels, token_count)
+                    loss.backward()
+                    reference_loss.backward()
+    
+>                   torch.testing.assert_close(loss, reference_loss)
+E                   AssertionError: Scalars are not close!
+E                   
+E                   Expected nan but got nan.
+E                   Absolute difference: nan (up to 1e-05 allowed)
+E                   Relative difference: nan (up to 1.3e-06 allowed)
+
+_          = {}
+chunked_loss = <torchtitan.components.loss.ChunkedLossWrapper object at 0x7f2ad8ee73e0>
+hidden_TD  = tensor([[nan, nan, nan,  ..., nan, nan, nan],
+        [nan, nan, nan,  ..., nan, nan, nan],
+        [nan, nan, nan,  ....nan,  ..., nan, nan, nan],
+        [nan, nan, nan,  ..., nan, nan, nan],
+        [nan, nan, nan,  ..., nan, nan, nan]])
+labels     = tensor([-100,  160,  340, 1746, 1514,  221,  698,  319])
+loss       = tensor(nan, requires_grad=True)
+model      = Llama3Model(
+  (tok_embeddings): Embedding(2048, 256)
+  (layers): ModuleDict(
+    (0): Llama3TransformerBlock(
+      (...r(in_features=256, out_features=2, bias=False)
+    (lora_b): Linear(in_features=2, out_features=2048, bias=False)
+  )
+)
+model_config = FrozenLlama3Model.Config(param_init=None, sharding_config=None, local_compile_regions=['loss', 'fused_binary_activatio...rdings=None, local_spmd=False), normalized_shape=256, eps=1e-05, elementwise_affine=True))], enable_weight_tying=False)
+num_chunks = 1
+positions  = tensor([0, 1, 2, 3, 4, 5, 6, 7])
+reference_head = LoRALinear(
+  in_features=256, out_features=2048, bias=False
+  (lora_a): Linear(in_features=256, out_features=2, bias=False)
+  (lora_b): Linear(in_features=2, out_features=2048, bias=False)
+)
+reference_loss = tensor(nan, grad_fn=<DivBackward0>)
+self       = <tests.unit_tests.cpu.components.test_loss.TestChunkedLossWrapper testMethod=test_lora_head_only_matches_cross_entropy>
+token_count = tensor(7)
+tokens     = tensor([1117, 2023,  353, 1647, 1622,  663, 1817, 1101])
+trainable_names = {'lm_head.lora_a.weight', 'lm_head.lora_b.weight'}
+
+tests/unit_tests/cpu/components/test_loss.py:999: AssertionError
+============================================================================== warnings summary ===============================================================================
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py: 16 warnings
+  <string>:8: UserWarning: `barrier_config=None` requires `write_to_temp_dir=False`. Explicitly set `write_to_temp_dir=False` to hide this warning. This will become an error in a future version.
+
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_leaves_parameters_the_export_does_not_carry
+tests/unit_tests/cpu/components/checkpointer/test_torch_checkpointing.py::TorchCheckpointingManagerTest::test_hf_load_reads_a_real_safetensors_export
+  /workspace/venv_1025/lib/python3.12/site-packages/torch_checkpointing/staging.py:201: UserWarning: Ignoring pin_memory flag for checkpoint staging as pinning memoryrequires CUDA, but CUDA is not available. 
+    self._state_dict_stager = StateDictStager(
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 20 warnings
+  /workspace/venv_1025/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to save in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/components/data/test_dataset_checkpointing.py: 1 warning
+tests/unit_tests/cpu/components/optim/test_ema.py: 3 warnings
+tests/unit_tests/cpu/components/optim/test_optimizer_param_groups.py: 1 warning
+tests/unit_tests/cpu/models/test_state_dict_adapter.py: 1 warning
+tests/unit_tests/cpu/scripts/test_convert_ema_to_hf.py: 15 warnings
+  /workspace/venv_1025/lib/python3.12/site-packages/torch/distributed/checkpoint/utils.py:488: UserWarning: torch.distributed is disabled, unavailable or uninitialized, assuming the intent is to load in a single process.
+    return func(*args, **kwargs)
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /workspace/venv_1025/lib/python3.12/site-packages/torch/distributed/tensor/_random.py:76: UserWarning: DTensor random operators may not have complete support on cpu device mesh
+    if not is_rng_supported_mesh(device_mesh):
+
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_2d_mesh
+tests/unit_tests/cpu/distributed/test_set_determinism.py::TestSetDeterminismWithFakeMesh::test_seed_uniqueness_3d_mesh
+  /workspace/wt_m3_5d/torchtitan/distributed/utils.py:254: UserWarning: DTensor manual_seed() may not have complete support on cpu device mesh
+    torch.distributed.tensor._random.manual_seed(
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /workspace/venv_1025/lib/python3.12/site-packages/spmd_types/_collectives.py:336: FutureWarning: `torch.distributed._functional_collectives.all_gather_tensor` is deprecated. Please use `torch.distributed.functional_collectives.all_gather_single` instead.
+    funcol.all_gather_tensor(x, gather_dim, pg), dtype_options.async_op
+
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_bfloat16_kv_reach_the_reducing_backward
+tests/unit_tests/cpu/models/common/test_cp_attention.py::TestAllGatherCollective::test_float32_kv_reach_the_reducing_backward
+  /workspace/venv_1025/lib/python3.12/site-packages/spmd_types/_collectives.py:681: FutureWarning: `torch.distributed._functional_collectives.reduce_scatter_tensor` is deprecated. Please use `torch.distributed.functional_collectives.reduce_scatter_single` instead.
+    funcol.reduce_scatter_tensor(x, "sum", scatter_dim, pg),
+
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[4]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_compressor.py::test_default_positions_match_explicit_positions[128]
+tests/unit_tests/cpu/models/deepseek_v4/test_deepseek_v4_dsa.py::TestDSVPackedDocuments::test_packed_attention_matches_each_document_alone
+  /workspace/wt_m3_5d/torchtitan/models/deepseek_v4/compressor.py:144: UserWarning: In CPU autocast, but the target dtype is not supported. Disabling autocast.
+  CPU Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.
+    with torch.autocast(device_type=x.device.type, dtype=torch.float32):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+----------------------------------------------- generated xml file: /workspace/kit_m3_5060/cpu_full/minimax_m3_5d_43ccfadb5.xml -----------------------------------------------
+=========================================================================== short test summary info ===========================================================================
+FAILED tests/unit_tests/cpu/components/test_loss.py::TestChunkedLossWrapper::test_lora_head_only_matches_cross_entropy - AssertionError: Scalars are not close!
+1 failed, 1972 passed, 18 skipped, 3 xfailed, 76 warnings in 696.01s (0:11:36)

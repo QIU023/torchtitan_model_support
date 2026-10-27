@@ -1,0 +1,37 @@
+m3_5060_shim: rank - flash attention selection off
+m3_5060_shim: rank 0 flash attention selection off
+WARNING:absl:Failed to load jax profiler: No module named 'jax'
+W1027 05:35:42.585000 356341 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+W1027 05:35:42.622000 356341 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+[titan] 2026-10-27 05:35:43,497 - __main__ - INFO - torchtitan version: 0.0.0+unknown (0.0.0 means __version__ is not defined correctly).
+[titan] 2026-10-27 05:35:43,748 - torchtitan_recipes.data - WARNING - C4 document capacity is an estimate. Tune dataloader.max_num_documents for your workload to balance attention overhead and packing padding.
+[titan] 2026-10-27 05:35:43,749 - torchtitan.components.checkpointer.base - WARNING - initial_load_model_only=True has no effect without an initial_load_path.
+[titan] 2026-10-27 05:35:43,751 - torchtitan.observability.structured_logger.jsonl_handler - INFO - Structured logging -> JSONL: /workspace/kit_m3_5060/runs5060/rebase_e111/seed_run_new/structured_logs/training.global_rank_0.20261027-053543-DNDP2Z.jsonl
+[titan] 2026-10-27 05:35:43,901 - torchtitan.distributed.utils - WARNING - TORCH_NCCL_ASYNC_ERROR_HANDLING=1 will be overridden to 3.
+[titan] 2026-10-27 05:35:44,566 - torchtitan.tools.garbage_collector - INFO - [GC] Initial GC collection took 0.00 seconds
+[titan] 2026-10-27 05:35:44,566 - torchtitan.distributed.utils - INFO - Deterministic algorithm enabled (expect perf degradation).
+[titan] 2026-10-27 05:35:44,583 - torchtitan.observability.metrics - INFO - CUDA capacity: NVIDIA GeForce RTX 5060 Ti with 15.48GiB memory
+[titan] 2026-10-27 05:35:44,584 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[titan] 2026-10-27 05:35:44,584 - torchtitan.config.configurable - WARNING - Config field value of type SDPBackend may not be JSON serializable
+[titan] 2026-10-27 05:35:44,592 - torchtitan.tools.utils - WARNING - Error running lspci: [Errno 2] No such file or directory: 'lspci', fallback to use device_name
+[titan] 2026-10-27 05:35:44,592 - torchtitan.tools.utils - WARNING - Peak flops undefined for: NVIDIA GeForce RTX 5060 Ti, fallback to A100
+[titan] 2026-10-27 05:35:44,593 - torchtitan.components.tokenizer - INFO - Loading tokenizer from tokenizer.json
+[titan] 2026-10-27 05:35:46,121 - httpx - INFO - HTTP Request: HEAD https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/json/json.py "HTTP/1.1 200 OK"
+[titan] 2026-10-27 05:35:46,137 - torchtitan.distributed.parallelism_context - INFO - Building device mesh with parallelism: pp=1, dp_replicate=1, dp_shard=1, cp=1, tp=1, ep=1
+[titan] 2026-10-27 05:35:46,174 - torchtitan.distributed.parallelism_context - INFO - Successfully created meshes with active axes: []
+[titan] 2026-10-27 05:35:46,294 - torchtitan.models.base.state_dict_adapter - WARNING - model.safetensors.index.json not found at hf_assets_path: ./tests/assets/tokenizer/model.safetensors.index.json.                     Defaulting to saving a single safetensors file if checkpoint is saved in HF format
+[titan] 2026-10-27 05:35:46,297 - torchtitan.models.common.flops - INFO - Total parameter count: 10,100,160, active parameters: 4,861,120
+[titan] 2026-10-27 05:35:46,578 - torchtitan.training_engine - INFO - Model MiniMaxM3Model.Config size: 10,100,160 total parameters
+[titan] 2026-10-27 05:35:46,581 - torchtitan.components.optim.optimizer - INFO - Optimizer AdamW (model_part=0): 159 params [.*] {'lr': 0.0008, 'betas': (0.9, 0.95), 'eps': 1e-08, 'weight_decay': 0.1, 'foreach': None, 'fused': True}
+[titan] 2026-10-27 05:35:46,582 - torchtitan.components.checkpointer.base - WARNING - initial_load_model_only=True has no effect without an initial_load_path.
+[titan] 2026-10-27 05:35:46,584 - torchtitan.components.checkpointer.dcp - INFO - Checkpointing active. Checkpoints will be loaded from and saved to /workspace/kit_m3_5060/runs5060/rebase_e111/seed_new
+[titan] 2026-10-27 05:35:46,584 - torchtitan.trainer - INFO - Peak FLOPS used for computing MFU: 3.120e+14
+[titan] 2026-10-27 05:35:46,584 - torchtitan.trainer - INFO - CUDA memory usage for model: 0.00GiB(0.00%)
+[titan] 2026-10-27 05:35:46,584 - torchtitan.trainer - INFO - Trainer is initialized with 512 tokens per DP rank, 4096 tokens per train step, gradient accumulation steps 8, maximum context length 512, total steps 20 (warmup 2)
+[titan] 2026-10-27 05:35:46,584 - torchtitan.components.checkpointer.dcp - INFO - Saving the checkpointer.
+[titan] 2026-10-27 05:35:46,586 - torchtitan.components.checkpointer.dcp - INFO - Saving a model only checkpoint in torch.float32 at last step, step 0.
+[titan] 2026-10-27 05:35:46,702 - torchtitan.tools.garbage_collector - INFO - [GC] GC collection invoked by checkpointer. took 0.00 seconds
+[titan] 2026-10-27 05:35:46,703 - torchtitan.components.checkpointer.dcp - INFO - Last step checkpoint completed in 0.12s
+[titan] 2026-10-27 05:35:46,703 - __main__ - INFO - Created seed checkpoint
+[titan] 2026-10-27 05:35:46,703 - torchtitan.components.checkpointer.base - INFO - Destroying the purge thread.
+[titan] 2026-10-27 05:35:47,052 - __main__ - INFO - Process group destroyed

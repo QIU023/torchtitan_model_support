@@ -1,0 +1,23 @@
+05:34:10 old 9a5ab9ebe new a7db544ff new5d 43ccfadb5 dirty=0
+05:34:54 parity old rc=0 shim=1
+05:35:18 parity new rc=0 shim=1
+05:35:18 parity: all 6 metric lines identical
+05:35:34 seed old: written
+05:35:49 seed new: written
+05:36:45 fsdp4 old rc=0 shim=4 seed_loaded=4 step1=[1 8.032692909240723 1.7898139953613281] step3=[3 6.308054447174072 2.110835313796997]
+05:37:16 fsdp4 new rc=0 shim=4 seed_loaded=4 step1=[1 8.032692909240723 1.7898139953613281] step3=[3 6.308054447174072 2.110835313796997]
+05:37:17 fsdp4 loss files identical: 4/4
+05:37:19 fsdp4 step-1 grads old vs new: 159/159 parameters bitwise equal; worst group relative L2 difference 0.00e+00
+05:37:33 gpu_unit baseline rc=0 2 passed, 1 warning in 8.25s
+05:37:48 gpu_unit 5d rc=0 2 passed, 1 warning in 8.49s
+05:39:20 ci minimax_m3_mm_fsdp rc=0 [step: 1 loss: 8.13834;step: 10 loss: 3.98410;]
+05:39:20 ci minimax_m3_mm_fsdp+tp+sp+ep rc=0 [step: 1 loss: 8.16710;step: 10 loss: 4.39789;]
+05:39:20 GPU_REBASE_DONE
+05:41:42 parity5d old 89fc094d1 new 43ccfadb5
+05:42:25 parity5d free old rc=0
+05:42:49 parity5d free new rc=0
+05:42:49 parity5d free: all 6 metric lines identical
+05:43:14 parity5d imposed old rc=0
+05:43:38 parity5d imposed new rc=0
+05:43:38 parity5d imposed: all 6 metric lines identical
+05:43:38 PARITY5D_REBASE_DONE

@@ -1,0 +1,5 @@
+05:34:09 start main_e111f10d4 at e111f10d4 dirty=0
+05:45:31 main_e111f10d4 rc=1 1 failed, 1946 passed, 18 skipped, 3 xfailed, 76 warnings in 678.07s (0:11:18)
+05:45:31 start minimax_m3_a7db544ff at a7db544ff dirty=0
+05:57:09 minimax_m3_a7db544ff rc=1 1 failed, 1970 passed, 18 skipped, 3 xfailed, 76 warnings in 694.24s (0:11:34)
+05:57:09 start minimax_m3_5d_43ccfadb5 at 43ccfadb5 dirty=0

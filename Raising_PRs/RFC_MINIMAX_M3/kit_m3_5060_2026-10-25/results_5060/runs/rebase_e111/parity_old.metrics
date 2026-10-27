@@ -1,0 +1,6 @@
+pixel values: max_diff=4.768e-07 num_differ=0/677376
+vision features: shape=(144, 256) cos=0.999995 max_diff=6.104e-05
+sparse attention key blocks: 8729/9324 selections match (93.6%)
+router choices: 2288/2331 selections match (98.2%)
+last-token logits: KL=1.9806e-05 cos=0.999984 max_diff=3.1250e-02 top1=100.0%
+all-position logits: KL=3.1821e-03 cos=0.996733 max_diff=2.3984e+00 top1=90.4%

@@ -1,0 +1,19 @@
+m3_5060_shim: rank - flash attention selection off
+WARNING:absl:Failed to load jax profiler: No module named 'jax'
+W1027 05:43:20.918000 378281 torch/utils/_pytree.py:646] <enum 'KernelPreference'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+W1027 05:43:20.962000 378281 torch/utils/_pytree.py:646] <enum 'ScaleCalculationMode'> is an Enum subclass and is now natively supported by torch.compile as an opaque value type. Calling register_constant() on Enum subclasses is deprecated and will be an error in a future release.
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 1040.07it/s]
+revision=f0e1c1e04d40177e4673a22097036854f536e9c0 seed=42 dtype=torch.bfloat16 hf_attn=eager tt_attn=varlen hf_experts=grouped_mm
+Loading HuggingFace MiniMax M3 code on cuda ...
+Loading weights:   0%|          | 0/182 [00:00<?, ?it/s]Loading weights: 100%|██████████| 182/182 [00:00<00:00, 2579.37it/s]
+special tokens: {'image_id': 200025, 'video_id': 200026}
+Loading TorchTitan MiniMax M3 (debugmodel) on cuda ...
+tokens=(333,) pixel_values=(576, 1176) grid_thw=[[1, 24, 24]] HF grid_thw=[[1, 24, 24]]
+pixel values: max_diff=4.768e-07 num_differ=0/677376
+/workspace/venv_1025/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+vision features: shape=(144, 256) cos=0.999986 max_diff=1.221e-04
+sparse attention key blocks: 9324/9324 selections match (100.0%)
+router choices: 2331/2331 selections match (100.0%)
+last-token logits: KL=9.2993e-06 cos=0.999992 max_diff=1.5625e-02 top1=100.0%
+all-position logits: KL=4.7372e-05 cos=0.999954 max_diff=9.3750e-02 top1=98.5%

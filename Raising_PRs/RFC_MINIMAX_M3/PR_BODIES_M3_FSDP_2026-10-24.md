@@ -2,6 +2,18 @@
 
 ## 状态（不粘贴）
 
+- **10-26 晚（太平洋时间）rebase 到 upstream main `e111f10d4`（#5583 Tied RoPE cache）：** `minimax_m3` = `a7db544ff`（P1 `0e146e96a`、P2 `1b733eba3`、P3 `a1a1ef432`、P1b `848102e45`、M3 `a7db544ff`），已推到 fork：先把旧 head `9a5ab9ebe` 推成 `backup/minimax_m3_pre_20261026`，再 force-with-lease（用户这次的指示：这个分支还没有 PR）。
+  - 冲突只在 `torchtitan/models/common/decoder.py` 的 import 块（P1b 应用时）：#5583 加的 `rope` import 和 P1b 加的 `norm` import 两行都留，按模块名排序。rerere 关着，只改了冲突段。
+  - 核对：8 个提交里 7 个 patch-id 相同；P1b 的 patch-id 不同（上下文里多了 `rope` 那行），24 行增删行逐行相同；提交信息和作者都没变。两棵新树改动过的 .py 文件跑 pyflakes，没有未定义的名字。
+  - #5583 在 `Decoder` 里把类型和 config 相同的 `RoPE` 的 cache 指向同一个张量（构造时一次，`init_states` 之后一次）。M3 的模型类经 `MultimodalModel` 继承 `Decoder`，60 层 attention 用同一个 `CosSinRoPE.Config`，indexer 调用的是 attention 自己的 `self.rope`，所以 cache 都并成一份。M3 不写 cache；视觉塔用的是静态函数 `CosSinRoPE.apply_rotary_emb`，不受影响。
+  - H100（`87.116.91.146 -p 11468`）已经连不上（端口拒绝连接），所以检查都在本机 5060 上做，结果在 `kit_m3_5060_2026-10-25/results_5060/runs/rebase_e111/` 和 `results/cpu_full/`，脚本在 `rebase_e111/`：
+    - 基线树 bf16 对拍（默认参数）：旧树 `9a5ab9ebe` 和新树共用一份全新的 cache，输出的 6 行指标逐字相同（5060 上是 93.6% / 98.2% / 1.98e-5 / 3.18e-3）。正文第一行（93.8% / 97.9% / 1.50e-5 / 3.61e-3）是 H100 的数，和 5060 的不同是硬件造成的，不是 rebase。
+    - 基线树 fsdp4 跑 3 步（`c4_test`，新旧各自生成 seed，新树用旧树填好的 cache 的副本）：4 个 rank 的 loss 文件全部逐字节相同，第 1 步梯度 159/159 逐位。第 1 步是 8.032692909240723 / 1.7898139953613281，和 10-26 5060 上 4D 矩阵里 fsdp4 的第 1、3 步也逐位相同；正文 HSDP 表的 8.032684 / 1.7898 是 H100 的数。
+    - 5D 树 bf16 对拍（不强制和强制 HF 选择两种）：新旧逐字相同，也和 4D 正文引用的 10-26 那次逐字相同。
+    - CPU 全量（一遍接一遍）：新 main 1946 passed / 18 skipped / 3 xfailed / 1 failed；基线 1970 / 18 / 3 / 1；5D 1972 / 18 / 3 / 1。只在分支上失败的都是 0，唯一的失败是三棵树都有的 `test_lora_head_only_matches_cross_entropy`（5060 上的 NaN 测试）。main 新加的 `test_rope_cache_tying.py` 4 个测试三棵树都过。
+    - GPU 单测：两棵新树都是 2 passed。集成格子 `minimax_m3_mm_fsdp` 和 `minimax_m3_mm_fsdp+tp+sp+ep` 都通过。这两个格子的 recipe 不固定 seed（`seed` 默认 None），同一棵新树上 4D 格子跑两次，第 1 步分别是 8.16710 和 8.03160，所以拿它们的 loss 和之前比没有意义。
+  - 粘贴区的 CPU 计数还没有换：正文现在每个数都是 H100 的，新 main 上的计数只有 5060 的（基线 1970 passed，外加 5060 上两边都失败的 NaN 测试）。写 5060 的数，还是再开一台 H100 重跑，等用户决定。
+
 - **10-26 CPU 会话按第二次审核改（用户："全部都改"）：** Results 那句改成 "HSDP's loss and grad norm match FSDP's bitwise through step 3"，因为下面一条说第 1 步有 33 个参数的梯度不同，原句读起来像矛盾。粘贴区别的地方没动。rebase 到 main（#5583 的冲突）和重跑见 `REVIEW_M3_PRS_2026-10-25.md` 第二次审核第 1 条，要 GPU 会话做。
 
 - **10-26 H100（`root@87.116.91.146 -p 11468`，4 x H100 NVL 95 GB，driver 595.91 / CUDA 13.2，torch 2.16.0.dev20261024+cu130）：正文里每个数字现在都来自这台机器。**

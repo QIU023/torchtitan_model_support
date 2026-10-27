@@ -1,0 +1,7 @@
+main {'skipped': 21, 'passed': 1946, 'failure': 1}; branch {'skipped': 21, 'passed': 1972, 'failure': 1}
+failing or erroring on the branch only: 0
+failing on both: ['tests.unit_tests.cpu.components.test_loss.TestChunkedLossWrapper::test_lora_head_only_matches_cross_entropy']
+tests new on the branch: 26; tests gone from the branch: []
+branch tests matching 'tests.unit_tests.cpu.models.minimax_m3': {'passed': 18}
+branch tests matching 'MiniMaxM3': {'passed': 2}
+branch tests matching 'test_rope_cache_tying': {'passed': 4}
