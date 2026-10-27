@@ -166,6 +166,11 @@
 
 用户："拉取 基线body删除了不用的版本，再次审核"。
 
+> **处理：** 用户说"全改"，第 1 到 5 条都改了。
+> - 基线 `minimax_m3` amend 成 `8a2651476`（旧 head 在 `backup/minimax_m3_pre_20261027`）；
+> - 5D 重新叠上去，先推到 `minimax_m3_5d_review1` = `70b6efa63`；#5619 等用户点头再同步；
+> - 细节见两份正文文件的状态区。
+
 对象：
 - 基线 `minimax_m3` = `a7db544ff`，base `e111f10d4`。upstream main 现在是 `13806cbae`（只多了 #5634，改 `qwen3/flavors.py`），合并没有冲突。
 - 正文：`PR_BODIES_M3_FSDP_2026-10-24.md`，标题第 118 行，粘贴区第 120 到 203 行。

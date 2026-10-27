@@ -2,6 +2,15 @@
 
 ## 状态（不粘贴）
 
+- **10-27 CPU 会话按第三次审核改（用户："全改"）：**
+  - README（在 M3 提交里）：对拍的四个数换成正文那次 H100 的（1.50e-5 / 93.8% / 97.9% / 4.07e-5）。删掉 "Indexer Warmup" 一节和 M3.1-Flash 那段，依据是 shuhuayu 08-14 在 #4025 说的"README 不列变体、不写怎么运行"。warmup 仍写在正文 Design 里，M3.1-Flash 权重的限制仍写在 Current scope 里。
+  - 提交信息里也有旧数和旧说法，一起改了："last-token KL is 8.4e-6" 换成 1.5e-5，"trains only the index projections" 补上 "and their norms"。
+  - amend 之后 `minimax_m3` = `8a2651476`，和 `a7db544ff` 比只差 README（+3/-14）。先把 `a7db544ff` 推成 `backup/minimax_m3_pre_20261027`，再 force-with-lease。只改了文档，没有重跑测试。
+  - 粘贴区改了三处：
+    - Results 的两段设置说明拆成 bullet；
+    - "Pixels match to 4.8e-7." 写清楚比的是两边处理器的预处理，并把视觉特征的差并进同一条；
+    - 加一条，说明 fp32 的负 KL 是 0 附近的舍入。
+
 - **10-26 删掉文件末尾三份不再使用的 prep 正文（用户："删了 太confuse了"）：** 原文在 logbook 提交 `2e974a88` 的这个文件里。文件里现在只有 `## M3 PR` 一份粘贴区。
 
 - **10-26 CPU 会话核对 rebase（用户："拉取"）：**
@@ -165,7 +174,10 @@ Add MiniMax M3 (428B total, 23B activated), a natively multimodal MoE whose deco
 - Pre-commit on the changed files: every hook passes except Pyrefly, which reports 0 errors and, as on main, only removes the unused `missing-import` ignore on `import av` in `components/data/multimodal/utils/video.py`.
 
 ## Results
-The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF, and runs one 333-token image and text prompt on one H100 NVL; "HF imposed" runs TorchTitan on HF's block and expert selections.
+HF parity on one H100 NVL:
+
+- The parity test reduces the released HF config to `debugmodel`, loads the TorchTitan weights into HF, and runs one 333-token image and text prompt.
+- "HF imposed" runs TorchTitan on HF's block and expert selections.
 
 | dtype | selections | block selections match | expert choices match | last-token KL | all-position KL |
 |---|---|---|---|---|---|
@@ -174,11 +186,17 @@ The parity test reduces the released HF config to `debugmodel`, loads the TorchT
 | fp32 | free | 98.9% | 99.6% | -9.8e-7 | 4.68e-4 |
 | fp32 | HF imposed | 100% | 100% | -1.9e-7 | 2.13e-6 |
 
-- Pixels match to 4.8e-7.
+- TorchTitan's image preprocessing matches HF's processor to a max difference of 4.8e-7, and the projected vision features match to 6.1e-5 in bf16 and 1.2e-8 in fp32.
 - In fp32 every module matches HF to rounding except the routed experts, whose grouped GEMMs run in bf16 by design.
+- The negative fp32 last-token KL values are rounding error around zero.
 - The fp32 rows use `--attn_backend flex`, since varlen computes in bf16.
 
-4 x H100 NVL, debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps; every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed. fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor. Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h100/run_hsdp_h100.sh).
+FSDP2 and HSDP on 4 x H100 NVL:
+
+- Debug model reading `c4_test` as text-only 512-token rows, 4096 tokens per step (two micro-batches per rank), AdamW, seed 42, deterministic, 100 steps.
+- Every cell loads one single-GPU seed checkpoint and runs on a copy of one compile cache that 10 steps of each layout warmed.
+- fsdp4 and HSDP 2 x 2 (dp_replicate 2 x dp_shard 2) read the same samples, and fsdp4 runs twice as the noise floor.
+- Kit, not part of this PR: [run_hsdp_h100.sh](https://github.com/QIU023/torchtitan_model_support/blob/b8492e785771/Raising_PRs/RFC_MINIMAX_M3/kit_m3_5060_2026-10-25/h100/run_hsdp_h100.sh).
 
 HSDP's loss and grad norm match FSDP's bitwise through step 3, and the grad norm parts at step 4, because HSDP adds the ranks' gradients in a different order.
 
