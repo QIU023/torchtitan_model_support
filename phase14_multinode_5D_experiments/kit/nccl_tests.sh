@@ -1,5 +1,5 @@
 #!/bin/bash
-# nccl-tests for multinode.md 5.1 ([X] intra-node busbw, [Y] cross-node busbw). Run on node 0; needs MPI and
+# nccl-tests for multinode.md 5.1 (goal E2: intra-node and cross-node busbw). Run on node 0; needs MPI and
 # passwordless ssh to node 1. Usage: NODE0=<host> NODE1=<host> nccl_tests.sh
 # Builds nccl-tests at the commit multinode.md cites (afd59ab) against the venv's NCCL, then runs 1 GiB-per-rank sweeps.
 . "$(dirname "$0")/env.sh"

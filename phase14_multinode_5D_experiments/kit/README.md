@@ -56,7 +56,7 @@ K3（multinode.md §3.6 推荐配置，加 §5.2 的放置对照）：
 | `k3_B_keep` / `k3_B_ep16_keep` | ep 8 / 16 | 32K | 32K | 32K | §5.2 的「整步不 reshard」对照 |
 
 - A100 的长度按 multinode.md §9.3 降：reference 门控在 5D、(A)、(C) 的 32K 放不下，粗估上限约 31K，取 24K；(D) 在 64K 也多出约 7.7 GB，取 48K；(B) 没有 PP、只有 1 个在途 micro-batch，64K 还放得下。都是纸面估计，probe 后改矩阵。另一个办法是 `MN_FLAVOR_OVERRIDE=k3_16x80g_small` 保持 H100 的长度。
-- §5.2 里「TP 跨节点」那组 what-if 要改 rank 到节点的映射，titan 默认 tp 在最内层，本 kit 没做。§5.3 的 DeepEP 对 NCCL（[c]）要单独的 DeepEP micro-benchmark，A100 做不了（§9.5），也不在本 kit 里。
+- §5.2 里「TP 跨节点」那组 what-if 要改 rank 到节点的映射，titan 默认 tp 在最内层，本 kit 没做。§5.3 的 DeepEP 对 NCCL（E4）要单独的 DeepEP micro-benchmark，A100 做不了（§9.5），也不在本 kit 里。
 
 M3（没有 CP，所以 K3 里 cp > 1 的行没有对应；长度是 probe 的起点）：
 
@@ -80,7 +80,7 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 3. tokenizer：
    - M3：`python scripts/download_hf_assets.py --repo_id MiniMaxAI/MiniMax-M3 --assets tokenizer --local_dir $B/assets`。
    - K3：`python kit/make_kimi_tokenizer.py $B/assets/kimi_k3_tokenizer`。失败的话下载 `Qwen/Qwen3-8B` 的 tokenizer，`ASSETS_K3` 指过去，并加 `MN_SPECIAL=qwen`（词表 151669 小于 163840，自带 `<|image_pad|>` 那一套特殊 token）。
-4. 通信基线（[X]、[Y]）：在 node 0 上运行 `NODE0=... NODE1=... bash kit/nccl_tests.sh`。没有 MPI 的话，两台机器都用 torchrun 跑 `kit/comm_bench.py`（16 卡一次，再 `--nnodes 1` 单机 8 卡一次）。
+4. 通信基线（E2）：在 node 0 上运行 `NODE0=... NODE1=... bash kit/nccl_tests.sh`。没有 MPI 的话，两台机器都用 torchrun 跑 `kit/comm_bench.py`（16 卡一次，再 `--nnodes 1` 单机 8 卡一次）。
 5. smoke：`export HW=h100 MASTER_ADDR=<node0> NODE_RANK=<0|1>`，然后 `bash kit/run_matrix.sh k3 smoke` 和 `bash kit/run_matrix.sh m3 smoke`。每行 debug 模型跑 5 步，确认每种布局都能起来。
 6. probe：`run_matrix.sh <k3|m3> probe` 用真模型在矩阵长度上跑 3 步，看 `summary_node0.tsv` 的 `peak_mem_gib` 和 `oom`。超了就在矩阵里缩短那一行，按 multinode.md §7.1 先拿 8K / 16K 校准。
 7. warm 再 measure：`run_matrix.sh <k3|m3> warm`，然后 `run_matrix.sh <k3|m3> measure`。measure 和 warm 共用一份编译 cache（每个节点各一份，在 `$OUT/cache/$HW/<model>/node<k>`）；measure 跑 30 步，第 25 步出 profiler trace，在 `<cell>/tt/` 下。
