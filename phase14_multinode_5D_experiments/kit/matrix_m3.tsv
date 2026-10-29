@@ -1,0 +1,8 @@
+# name	cell	seq_h100	seq_h200	seq_a100	extra (same columns as matrix_k3.tsv)
+# M3 has no CP, so the K3 cells with cp > 1 have no M3 twin; lengths are first guesses for the probe stage
+m3_A	pp=2,dp=2,tp=4,ep=8	16384	16384	16384	
+m3_B	dp=4,tp=4,ep=8	16384	16384	16384	
+m3_C	pp=2,dp=8,ep=8	8192	8192	8192	
+m3_D	pp=4,tp=4,ep=4	16384	16384	16384	
+m3_E	dpr=2,dp=8,ep=8	8192	8192	8192	
+m3_B_ep16	dp=4,tp=4,ep=16	16384	16384	16384	nosmoke

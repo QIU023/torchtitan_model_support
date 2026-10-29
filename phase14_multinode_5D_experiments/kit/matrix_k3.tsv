@@ -1,0 +1,12 @@
+# name	cell	seq_h100	seq_h200	seq_a100	extra (KEY=VAL applies everywhere, hw:KEY=VAL only on that hw; nosmoke skips the smoke stage)
+# multinode.md 3.6 recommended cells; A100 lengths from 9.3 (reference KDA gate costs memory)
+k3_5d	pp=2,dp=2,cp=2,tp=2,ep=8	32768	16384	24576	
+k3_A	pp=2,dp=2,tp=4,ep=8	32768	16384	24576	
+k3_B	dp=2,cp=4,tp=2,ep=8	65536	32768	65536	h200:MN_FSDP_KEEP=1
+k3_C	pp=2,dp=2,cp=4,ep=8	32768	16384	24576	
+k3_D	pp=2,cp=4,tp=2,ep=8	65536	65536	49152	
+k3_D_ulysses	pp=2,cp=4,tp=2,ep=8	65536	65536	49152	MN_CP=ulysses nosmoke
+# multinode.md 5.2 placement pairs: EP 16 across the nodes against EP 8 inside a node, per-layer reshard and keep
+k3_B_ep16	dp=2,cp=4,tp=2,ep=16	65536	32768	65536	h200:MN_FSDP_KEEP=1 nosmoke
+k3_B_keep	dp=2,cp=4,tp=2,ep=8	32768	32768	32768	MN_FSDP_KEEP=1
+k3_B_ep16_keep	dp=2,cp=4,tp=2,ep=16	32768	32768	32768	MN_FSDP_KEEP=1 nosmoke
