@@ -73,7 +73,7 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 
 ## 4. 步骤
 
-两台机器都要执行同一条命令（`NODE_RANK` 不同），或者用 `srun` 每节点一个任务。下面的 `kit` 指本目录。
+逐条可复制的命令在 `RUNBOOK.md`（2026-10-29），这里是概要。两台机器都要执行同一条命令（`NODE_RANK` 不同），或者用 `srun` 每节点一个任务。下面的 `kit` 指本目录。`HW` 除了 `h100` / `h200` / `a100`，还有 `generic`（比如 vast 上的 8×5090），只做通信和 smoke。
 
 1. 每个节点：`HW=h100 bash kit/setup.sh`（A100 用 `HW=a100`）。看到 `SETUP_OK`，并核对 `nvidia-smi` 的卡型和 compute capability（A100 应是 `A100-SXM4-80GB`、`8.0`，见 multinode.md §9.6）。
 2. 在 `kit/env.sh` 里填 `NCCL_IB_HCA`、`NCCL_SOCKET_IFNAME`。
@@ -108,5 +108,7 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `run_matrix.sh` | 一个模型、一个阶段，跑矩阵的每一行 |
 | `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型的组合和每种卡的长度 |
 | `summarize.py` | 解析日志，出每格一行的 TSV |
+| `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
+| `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
 | `nccl_tests.sh`、`comm_bench.py` | busbw：nccl-tests（主）和 torch.distributed（备） |
 | `make_kimi_tokenizer.py` | 把 Kimi K3 的 tiktoken 转成 `tokenizer.json` |

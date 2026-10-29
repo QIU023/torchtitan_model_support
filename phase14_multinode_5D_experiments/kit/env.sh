@@ -25,12 +25,15 @@ case $HW in
   h200) FLAVOR_k3=k3_16x141g; FLAVOR_m3=m3_16x141g; GATE=fused ;;
   # A100: the fused bounded KDA gate needs sm90; no NVLS on the A100 NVSwitch.
   a100) FLAVOR_k3=k3_16x80g;  FLAVOR_m3=m3_16x80g;  GATE=reference; export NCCL_NVLS_ENABLE=0 ;;
-  *) echo "HW must be h100, h200 or a100, got $HW" >&2; return 1 2>/dev/null || exit 1 ;;
+  # Any other card (e.g. 8x RTX 5090 on a vast overlay): smoke and communication only; the downscales need 80 GB.
+  # M3's full-attention layers move to flex there: the M3 5060 kit needed a shim to keep varlen off FlashAttention on sm120.
+  generic) FLAVOR_k3=k3_16x80g_small; FLAVOR_m3=m3_16x80g_small; GATE=reference; export MN_ATTN=${MN_ATTN:-flex} ;;
+  *) echo "HW must be h100, h200, a100 or generic, got $HW" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
 
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
-# Cluster specific, fill in before the first run (ibstat / ip addr): which HCAs NCCL uses and the bootstrap interface.
-# export NCCL_IB_HCA=mlx5_0,mlx5_1,...
-# export NCCL_SOCKET_IFNAME=...
-# export GLOO_SOCKET_IFNAME=$NCCL_SOCKET_IFNAME
+# Cluster specific, set before the first run (RUNBOOK.md step 3): the interface both nodes reach each other on, and the
+# InfiniBand HCAs if any (ibstat). On a vast overlay the interface is eth0 and there is no IB.
+[ -n "${MN_IFNAME:-}" ] && export NCCL_SOCKET_IFNAME=$MN_IFNAME GLOO_SOCKET_IFNAME=$MN_IFNAME
+[ -n "${MN_IB_HCA:-}" ] && export NCCL_IB_HCA=$MN_IB_HCA
 export UV_CACHE_DIR=${UV_CACHE_DIR:-$B/.uvcache}

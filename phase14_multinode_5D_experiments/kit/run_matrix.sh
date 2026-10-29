@@ -22,7 +22,7 @@ note() { echo "$(date +%T) $*" | tee -a $P/progress_node$NODE_RANK.txt; }
 while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   [[ "$ONLY" != "  " && "$ONLY" != *" $name "* ]] && continue
-  case $HW in h100) seq=$s_h100 ;; h200) seq=$s_h200 ;; a100) seq=$s_a100 ;; esac
+  case $HW in h100) seq=$s_h100 ;; h200) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
   envs=(MN_MODEL=$MODEL MN_CELL=$cell MN_GATE=$GATE MN_JOB=p14_${HW}_${MODEL}_${STAGE}_$name)
   skip=0
   for item in ${extra:-}; do
