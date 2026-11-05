@@ -31,7 +31,9 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   for item in ${extra:-}; do
     case $item in
       nosmoke) [ $STAGE = smoke ] && skip=1 ;;
-      *:*) [ "${item%%:*}" = $HW ] && envs+=("${item#*:}") ;;
+      # b200 runs the h200 lengths, so it also takes the h200-only variables.
+      *:*) tag=${item%%:*}
+           if [ "$tag" = $HW ] || { [ $HW = b200 ] && [ "$tag" = h200 ]; }; then envs+=("${item#*:}"); fi ;;
       *) envs+=("$item") ;;
     esac
   done
