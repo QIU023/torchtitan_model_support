@@ -104,11 +104,13 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 |---|---|
 | `env.sh` | 路径、分支提交号、torch nightly、每种卡的 flavor 和门控、NCCL 变量 |
 | `setup.sh` | 克隆分支、建 venv、装依赖、检查卡和 import |
-| `launch.sh` | 一个格子：torchrun 2 × 8，`--module torchtitan_recipes.multinode_5d --config cell` |
+| `launch.sh` | 一个格子：torchrun 2 × 8，静态 rendezvous（node 0 持有 store，rank 0-7 在 node 0），`--module torchtitan_recipes.multinode_5d --config cell` |
 | `run_matrix.sh` | 一个模型、一个阶段，跑矩阵的每一行 |
 | `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型的组合和每种卡的长度 |
 | `summarize.py` | 解析日志，出每格一行的 TSV |
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
 | `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
+| `run_comm.sh` | 两台一起：comm_bench 加 NCCL INFO 日志，判断走 IB 还是 socket、有没有 GPUDirect RDMA，列出大消息 busbw |
+| `nebius/README.md`、`nebius/p14_pods.yaml`、`nebius/k8s.sh` | Nebius 同一个 GPU cluster 的两个 pod：操作流程、pod 清单（Indexed Job + headless Service）、本机驱动两个 pod 的脚本 |
 | `nccl_tests.sh`、`comm_bench.py` | busbw：nccl-tests（主）和 torch.distributed（备） |
 | `make_kimi_tokenizer.py` | 把 Kimi K3 的 tiktoken 转成 `tokenizer.json` |

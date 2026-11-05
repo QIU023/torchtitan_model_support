@@ -12,18 +12,21 @@ MODEL=$1
 STAGE=$2
 shift 2
 ONLY=" $* "
-NODE_RANK=${NODE_RANK:-${SLURM_NODEID:-0}}
+MATRIX=${MN_MATRIX:-$K/matrix_$MODEL.tsv}
 FLAVOR_VAR=FLAVOR_$MODEL
 ASSETS_VAR=ASSETS_$MODEL
 P=$OUT/$HW/$STAGE
 mkdir -p $P
 note() { echo "$(date +%T) $*" | tee -a $P/progress_node$NODE_RANK.txt; }
+row=0
 
 while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   [[ "$ONLY" != "  " && "$ONLY" != *" $name "* ]] && continue
-  case $HW in h100) seq=$s_h100 ;; h200) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
-  envs=(MN_MODEL=$MODEL MN_CELL=$cell MN_GATE=$GATE MN_JOB=p14_${HW}_${MODEL}_${STAGE}_$name)
+  case $HW in h100) seq=$s_h100 ;; h200|b200) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
+  # Both nodes walk the same rows, so each cell gets the same fresh rendezvous port on both.
+  row=$((row + 1))
+  envs=(MN_MODEL=$MODEL MN_CELL=$cell MN_GATE=$GATE MN_PORT=$((MASTER_PORT + row)))
   skip=0
   for item in ${extra:-}; do
     case $item in
@@ -55,5 +58,5 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   note "start $name cell=$cell seq=$seq ${envs[*]}"
   env "${envs[@]}" bash $K/launch.sh $P/$name
   note "end $name rc=$?"
-done < $K/matrix_$MODEL.tsv
+done < $MATRIX
 python $K/summarize.py $P > $P/summary_node$NODE_RANK.tsv 2>&1 || true

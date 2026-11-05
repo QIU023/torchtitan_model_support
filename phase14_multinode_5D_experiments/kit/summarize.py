@@ -1,6 +1,6 @@
 """Summarize the cells of one stage directory: python summarize.py <OUT>/<hw>/<stage> [--skip N].
 
-Reads every <cell>/node<k>.log (torchrun --role rank --tee 3 prefixes lines with [rank<local>]:), takes the TorchTitan
+Reads every <cell>/node<k>.log (launch.sh has torchrun prefix lines with [rank<global rank>]:), takes the TorchTitan
 step lines of all ranks and prints one TSV row per cell: exit codes, OOM, steps, loss at the first and last step,
 the peak reserved memory over ranks (and which rank), and the median tps / tflops / mfu over steps after --skip
 (default 3, the compile and warm-up steps).
@@ -25,7 +25,6 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
     rows = []
     oom = False
     for log in sorted(cell.glob("node*.log")):
-        node = int(re.sub(r"\D", "", log.stem) or 0)
         for raw in log.read_text(errors="replace").splitlines():
             line = ANSI.sub("", raw)
             oom = oom or bool(OOM.search(line))
@@ -33,7 +32,7 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
             if not match:
                 continue
             prefix = PREFIX.match(line)
-            rank = node * nproc + int(prefix.group(1)) if prefix else -1
+            rank = int(prefix.group(1)) if prefix else -1
             step, loss, _, mem, mem_pct, tps, tflops, mfu = match.groups()
             rows.append(
                 dict(

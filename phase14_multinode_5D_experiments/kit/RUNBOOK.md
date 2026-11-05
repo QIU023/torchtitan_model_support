@@ -2,6 +2,8 @@
 
 照着从上往下复制粘贴。**node 0**、**node 1** 标的是在哪台机器上执行；"两台"表示两台都要执行，而且同一步要在一两分钟内一起开始（torchrun 会等另一台来 rendezvous）。
 
+**Nebius 上同一个 GPU cluster 的两个 k8s pod，不看这一份，看 `nebius/README.md`**：pod 由 `nebius/p14_pods.yaml` 拉起，命令由本机的 `nebius/k8s.sh` 同时发给两个 pod，不需要 ssh 和 tmux。
+
 ## 0. 先确定租什么
 
 | 租法 | 能做什么 | `HW` |
@@ -56,12 +58,10 @@ export NODE_RANK=0                   # node 1 上写 1
 ## 4. 通信基线 E2（两台一起）
 
 ```sh
-. ~/p14/venv/bin/activate
-torchrun --nnodes 2 --nproc_per_node 8 --node_rank $NODE_RANK --rdzv_backend c10d \
-  --rdzv_endpoint $MASTER_ADDR:29501 --rdzv_id comm $KIT/comm_bench.py --out ~/p14/runs/comm_16.json
+bash $KIT/run_comm.sh
 ```
 
-node 0 会打印每种集合通信的 busbw。跨节点的数（`world` 和 `cross_node` 两组）只要明显低于节点内，第 5 步以后的多节点运行就能通。有 MPI 和节点间 ssh 的话，再在 node 0 上跑 `NODE0=... NODE1=... bash $KIT/nccl_tests.sh`，表里的 E2 用 nccl-tests 的数。
+输出在 `~/p14/runs/$HW/comm/`。`verdict_node<k>.txt` 写着 NCCL 走的是 IB 还是 socket、跨节点有没有用上 GPUDirect RDMA；node 0 还会列出大消息的 busbw（`world` 是 16 卡，`node` 是单节点 8 卡，`cross_node` / `same_node` 是 sendrecv）。这一步能通，第 5 步以后的多节点运行就能通。有 MPI 和节点间 ssh 的话，再在 node 0 上跑 `NODE0=... NODE1=... bash $KIT/nccl_tests.sh`，表里的 E2 用 nccl-tests 的数。
 
 ## 5. smoke（两台一起，每个模型一次）
 
