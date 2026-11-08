@@ -8,9 +8,10 @@
 set -u
 MODEL=$1
 OUTJ=$2
+mkdir -p "$(dirname "$OUTJ")"
 . $V/bin/activate
 cd $T
-emit() { printf '{"MN_ASSETS": "%s", "MN_SPECIAL": "%s"}\n' "$1" "$2" > "$OUTJ"; echo "assets $MODEL: $1 ($2)"; exit 0; }
+emit() { printf '{"MN_ASSETS": "%s", "MN_SPECIAL": "%s"}\n' "$1" "$2" > "$OUTJ" || exit 1; echo "assets $MODEL: $1 ($2)"; exit 0; }
 case $MODEL in
   m3)
     D=$B/assets/MiniMax-M3
