@@ -62,4 +62,4 @@ bash phase14_multinode_5D_experiments/kit/k8s.sh status
 
 1. 先 `bash $K8S collect`；
 2. `kubectl delete -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml`；共享卷默认在集群删除后也保留。
-3. 最后在控制台删集群，不用时再删共享卷，否则会一直计费。
+3. 最后在控制台删集群，不勾 "Delete attached shared volume" 就会保留共享卷。保留的卷能挂到同一区域的新集群上接着跑（`../PLAYBOOK.md` 第 8.1 节）；不用时要删，否则会一直计费。
