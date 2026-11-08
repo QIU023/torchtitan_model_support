@@ -16,7 +16,10 @@
 #   k8s.sh collect [dir]       copy the results (no traces, no caches) to dir and summarize every stage
 #   k8s.sh comm                communication verdicts (IB, GPUDirect RDMA, raw RDMA per port, busbw, alpha-beta) and
 #                              the comparison of the NCCL tuning variants
-#   k8s.sh top                 latest GPU (utilization, memory, power, SM clock) and InfiniBand rates of every node
+#   k8s.sh top                 every GPU of every node from its DCGM exporter (utilization, SM and tensor activity,
+#                              memory, power, NVLink and PCIe rates), with the newest step line (loss, memory, tps,
+#                              tflops, mfu) of the cell the node runs
+#   k8s.sh watch [seconds]     top again every 5 (or the given) seconds until ctrl-c
 #   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
 #                              communication by process group / idle from the traces, InfiniBand rates
 #   k8s.sh trace <stage> <row> [dir]   one cell's ranks merged into one trace in dir, for ui.perfetto.dev
@@ -56,6 +59,17 @@ detached() {  # <tag> <command>: run in every running pod, detached from kubectl
     printf '%s\n' "$cmd" | kubectl exec -i -n "$NS" "$p" -- bash -c "mkdir -p $RUNS && cat > $RUNS/cmd_${tag}_\$(hostname).sh"
     on "$p" "setsid nohup bash $RUNS/cmd_${tag}_\$(hostname).sh > $RUNS/out_${tag}_\$(hostname).log 2>&1 < /dev/null &"
     echo "$p: started $tag (output $RUNS/out_${tag}_<hostname>.log)"
+  done
+}
+dcgm_map() {  # node rank=IP of the DCGM exporter on that pod's node, for monitor.py --dcgm
+  local eps name node idx
+  eps=$(kubectl get endpoints nvidia-dcgm-exporter -n gpu-operator \
+    -o jsonpath='{range .subsets[*].addresses[*]}{.nodeName}={.ip}{"\n"}{end}' 2>/dev/null || true)
+  kubectl get pods -n "$NS" -l "job-name=$JOB" --field-selector=status.phase=Running \
+    -o jsonpath='{range .items[*]}{.metadata.name} {.spec.nodeName}{"\n"}{end}' | while read -r name node; do
+    idx=${name#"$JOB"-}
+    idx=${idx%%-*}
+    printf '%s' "$eps" | grep "^$node=" | sed "s/^.*=/$idx=/" | tr '\n' ','
   done
 }
 killall_runs() {
@@ -133,7 +147,16 @@ case "${1:-status}" in
     on "$(any)" "for h in $RUNS/*/; do [ -d \${h}comm ] || continue; echo \"== \$h\"
       cat \${h}comm/verdict_node*.txt; $PY $KIT/comm_compare.py \$h; done; true" ;;
   top)
-    on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS" ;;
+    on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS --dcgm '$(dcgm_map)'" ;;
+  watch)
+    map=$(dcgm_map)
+    while true; do
+      view=$(on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS --dcgm '$map'" 2>&1)
+      clear
+      date
+      echo "$view"
+      sleep "${2:-5}"
+    done ;;
   report)
     on "$(any)" "for s in $RUNS/*/${2:-measure}; do [ -d \$s ] && $PY $KIT/trace_report.py \$s; done
       $PY $KIT/monitor.py --summary --out $RUNS > /dev/null; true" ;;

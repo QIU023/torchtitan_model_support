@@ -4,8 +4,10 @@ Without a flag (bootstrap.sh starts it once per container) it appends, every MN_
 GPU utilization, memory, power, SM clock, temperature and clock-event reasons (nvidia-smi) to
 <out>/<hw>/monitor/gpu_node<k>.csv, and the transmit and receive rate of every active InfiniBand or RoCE port
 (/sys/class/infiniband counters) to ib_node<k>.csv. Each row carries the node's pipeline state, so the samples of one
-task can be picked out. --show prints the latest sample of every node; --summary writes monitor_summary.tsv next to
-the samples, one row per node and task (its last attempt), and prints it.
+task can be picked out. --show prints the latest sample of every node with the newest step line of the cell it runs;
+with --dcgm node=ip,... it reads each node's DCGM exporter instead (SM and tensor activity, NVLink and PCIe rates; the
+pods on Together cannot read the IB counters). --summary writes monitor_summary.tsv next to the samples, one row per
+node and task (its last attempt), and prints it.
 """
 
 import argparse
@@ -13,9 +15,11 @@ import csv
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
@@ -177,8 +181,51 @@ def latest(rows: list[list[str]]) -> list[list[str]]:
     return [r for r in rows if r[0] == rows[-1][0]] if rows else []
 
 
-def show(out: Path) -> None:
+DCGM_LINE = re.compile(r'^(DCGM_\w+)\{([^}]*)\}\s+(\S+)')
+DCGM_GPU = re.compile(r'gpu="(\d+)"')
+
+
+def dcgm(ip: str) -> dict[int, dict[str, float]]:
+    """Per-GPU values from the node's DCGM exporter: {gpu: {metric name: value}}."""
+    try:
+        with urllib.request.urlopen(f"http://{ip}:9400/metrics", timeout=5) as resp:
+            text = resp.read().decode(errors="replace")
+    except OSError:
+        return {}
+    out: dict[int, dict[str, float]] = defaultdict(dict)
+    for line in text.splitlines():
+        m = DCGM_LINE.match(line)
+        g = DCGM_GPU.search(m.group(2)) if m else None
+        v = number(m.group(3)) if m else None
+        if g and v is not None:
+            out[int(g.group(1))][m.group(1)] = v
+    return out
+
+
+def show_dcgm(gpus: dict[int, dict[str, float]], totals: list) -> None:
+    print("  gpu  util%  sm_act  tensor  dram   mem GiB  power W  nvlink tx/rx GB/s  pcie tx/rx GB/s")
+    for g in sorted(gpus):
+        m = gpus[g]
+
+        def val(name, scale=1.0):
+            return m.get(name, float("nan")) * scale
+
+        row = (
+            val("DCGM_FI_DEV_GPU_UTIL"), val("DCGM_FI_PROF_SM_ACTIVE"), val("DCGM_FI_PROF_PIPE_TENSOR_ACTIVE"),
+            val("DCGM_FI_PROF_DRAM_ACTIVE"), val("DCGM_FI_DEV_FB_USED", 1 / 1024), val("DCGM_FI_DEV_POWER_USAGE"),
+            val("DCGM_FI_PROF_NVLINK_TX_BYTES", 1e-9), val("DCGM_FI_PROF_NVLINK_RX_BYTES", 1e-9),
+            val("DCGM_FI_PROF_PCIE_TX_BYTES", 1e-9), val("DCGM_FI_PROF_PCIE_RX_BYTES", 1e-9),
+        )
+        totals.append(row)
+        print(
+            f"  {g:>3}  {row[0]:5.0f}  {row[1]:6.2f}  {row[2]:6.2f}  {row[3]:4.2f}  {row[4]:8.1f}  {row[5]:7.0f}"
+            f"  {row[6]:8.1f} / {row[7]:<7.1f}  {row[8]:6.1f} / {row[9]:<6.1f}"
+        )
+
+
+def show(out: Path, dcgm_ips: dict[str, str] | None = None) -> None:
     now = time.time()
+    totals: list = []
     for d in sorted(out.glob("*/monitor")):
         for gpu_csv in sorted(d.glob("gpu_node*.csv")):
             node = gpu_csv.stem[len("gpu_node"):]
@@ -187,16 +234,56 @@ def show(out: Path) -> None:
                 continue
             age = now - float(rows[0][0])
             print(f"== {d.parent.name} node {node}: {age:.0f} s ago, {rows[0][1]}")
-            for r in rows:
-                mem, total = number(r[4]), number(r[5])
-                mem_s = f"{mem / 1024:6.1f} / {total / 1024:.0f} GiB" if mem is not None and total else r[4]
-                print(f"  gpu {r[2]}: util {r[3]:>3}%  mem {mem_s}  {r[6]:>7} W  {r[7]:>5} MHz  {r[8]:>3} C  {r[9]}")
+            gpus = dcgm(dcgm_ips[node]) if dcgm_ips and node in dcgm_ips else {}
+            if gpus:
+                show_dcgm(gpus, totals)
+            else:
+                for r in rows:
+                    mem, total = number(r[4]), number(r[5])
+                    mem_s = f"{mem / 1024:6.1f} / {total / 1024:.0f} GiB" if mem is not None and total else r[4]
+                    print(f"  gpu {r[2]}: util {r[3]:>3}%  mem {mem_s}  {r[6]:>7} W  {r[7]:>5} MHz  {r[8]:>3} C  {r[9]}")
             ib = latest(tail_rows(d / f"ib_node{node}.csv"))
             for layer in sorted({r[4] for r in ib}):
                 sel = [r for r in ib if r[4] == layer]
                 tx = sum(number(r[5]) or 0 for r in sel)
                 rx = sum(number(r[6]) or 0 for r in sel)
                 print(f"  {layer}: tx {tx:.2f} GB/s, rx {rx:.2f} GB/s over {len(sel)} ports")
+            step = last_step(d.parent, rows[0][1], node)
+            if step:
+                print(f"  last step: {step}")
+    if totals:
+        n = len(totals)
+
+        def mean(i):
+            return sum(t[i] for t in totals) / n
+
+        def total(i):
+            return sum(t[i] for t in totals)
+
+        print(
+            f"== all {n} GPUs: util {mean(0):.0f}%, SM active {mean(1):.2f}, tensor active {mean(2):.2f}, "
+            f"NVLink tx {total(6):.0f} GB/s, PCIe tx {total(8):.0f} / rx {total(9):.0f} GB/s "
+            "(with GPUDirect RDMA the inter-node traffic crosses PCIe)"
+        )
+
+
+def last_step(hw_dir: Path, state: str, node: str):
+    """The newest TorchTitan step line of the cell this node runs, or None."""
+    task = split_state(state)
+    if task is None or task[0].count(".") != 2:
+        return None
+    _, stage, row = task[0].split(".")
+    try:
+        with open(hw_dir / stage / row / f"node{node}.log", "rb") as f:
+            f.seek(0, os.SEEK_END)
+            f.seek(max(0, f.tell() - (1 << 18)))
+            lines = f.read().decode(errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        if "step:" in line and "mfu" in line:
+            return re.sub(r"\x1b\[[0-9;]*m", "", line).strip()
+    return None
 
 
 def split_state(state: str):
@@ -301,10 +388,11 @@ def main() -> int:
     parser.add_argument("--show", action="store_true")
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--dcgm", default="", help="node=ip,... of the nodes' DCGM exporters, for --show")
     args = parser.parse_args()
     out = args.out or default_out()
     if args.show:
-        show(out)
+        show(out, dict(item.split("=", 1) for item in args.dcgm.split(",") if "=" in item))
     elif args.summary:
         summary(out)
     else:

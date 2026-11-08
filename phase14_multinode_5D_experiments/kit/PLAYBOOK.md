@@ -183,12 +183,15 @@ tokenizer 的实际路径和 special token 的设置记在 `runs/<hw>/pipeline/a
 | 每个节点的 GPU 和 IB / RoCE 速率，标着任务 | 一直 | `monitor/gpu_node*.csv`、`ib_node*.csv` |
 | NCCL flight recorder（卡死时 dump） | 所有运行 | `<stage>/<行>/tt/comm_traces/` |
 
+实时的卡状态来自 Together 在每个节点上装的 DCGM exporter（`gpu-operator` 命名空间）。Together 的 pod 里读不到 IB 口的字节计数器（sysfs 没有 `counters`，`perfquery` 也超时），所以跨节点流量看 PCIe 速率：开了 GPUDirect RDMA，跨节点的数据从 GPU 经 PCIe 直接到网卡。
+
 MFU 是 titan 的口径：(6 × 激活参数 + MLA 和 KDA 的注意力算子 FLOPs) × tps ÷ bf16 稠密峰值（H100 / H200 989T，B200 2.25P），和 multinode.md 的纸面口径一致。
 
 ### 6.2 命令
 
 ```sh
-bash $K8S top                     # 每个节点最新的 GPU 和 IB
+bash $K8S top                     # 16 张卡的利用率、SM / Tensor Core 活跃度、显存、功耗、NVLink 和 PCIe 速率，以及正在跑的那一格最新一步（tps、MFU）
+bash $K8S watch 5                 # 每 5 秒刷新一次上面这一屏，ctrl-c 退出
 bash $K8S report                  # measure 每格一行：步时间、tps、MFU、峰值显存、计算 / 暴露通信 / 拷贝 / 空闲、暴露最多的进程组、IB 收发
 bash $K8S trace measure k3_5d     # 一格所有 rank 合成一份 trace，拉回本机，拖进 https://ui.perfetto.dev
 bash $K8S tb                      # TensorBoard，浏览器开 http://localhost:6006
