@@ -30,6 +30,13 @@
 set -euo pipefail
 # Git Bash on Windows rewrites /mnt/... arguments of native programs such as kubectl.exe into Windows paths.
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+# A terminal opened before winget installed kubectl does not have it on PATH yet.
+if ! command -v kubectl > /dev/null; then
+  for d in "$HOME"/AppData/Local/Microsoft/WinGet/Packages/Kubernetes.kubectl_*/ "$HOME"/AppData/Local/Microsoft/WinGet/Links/; do
+    [ -x "$d/kubectl.exe" ] && PATH="$d:$PATH" && break
+  done
+fi
+command -v kubectl > /dev/null || { echo "kubectl not found; install it or put it on PATH" >&2; exit 1; }
 NS=${NS:-default}
 JOB=${JOB:-p14}
 BASE=${BASE:-/mnt/shared/p14}
