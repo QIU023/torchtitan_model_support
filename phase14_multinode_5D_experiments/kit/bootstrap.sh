@@ -5,6 +5,9 @@
 # crashes, until it finishes or $B/STOP exists.
 # Afterwards the pod idles so kubectl exec and kit/k8s.sh keep working. MN_AUTORUN=0 skips the pipeline.
 KIT=$(cd "$(dirname "$0")" && pwd)
+# The scope set from your machine (k8s.sh scope) overrides the manifest's values.
+SCOPE=${MN_BASE:-$HOME/p14}/scope.env
+[ -f $SCOPE ] && . $SCOPE
 . $KIT/env.sh
 mkdir -p $B $OUT
 bash $KIT/setup_node.sh > $B/setup_node_$(hostname).log 2>&1

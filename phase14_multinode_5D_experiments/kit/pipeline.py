@@ -1,14 +1,16 @@
 """Unattended phase 14 pipeline for two nodes on a shared filesystem; resumes after preemption or restarts.
 
 bootstrap.sh starts it on both nodes. Tasks run in one order, frozen in $OUT/$HW/pipeline/tasks.json the first
-time node 0 starts: the communication check, the tokenizers, then the matrix cells (row by row: smoke, probe, warm,
-measure; MN_ORDER=stage runs every row's smoke first, and so on). Node 0 decides attempt numbers, retries, probe
+time node 0 starts: the communication check, the tokenizers, the matrix cells (row by row: smoke, probe, warm,
+measure; MN_ORDER=stage runs every row's smoke first, and so on), then one communication run per NCCL variant of
+comm_sweep.tsv (MN_COMM_SWEEP=0 leaves them out). Node 0 decides attempt numbers, retries, probe
 lengths and skips, and records each decision as a file under $OUT/$HW/pipeline/; node 1 follows those files. A
 finished task is never rerun, so a restarted pod resumes at the first unfinished one. Each node keeps a heartbeat
 with its state; a run whose peer died or moved on is killed and retried without counting as a failure. A probe that
 runs out of memory retries at half the length; warm and measure use the length the probe settled on. Probe stores a
 memory snapshot at step 2 (MN_MEMSNAP_PROBE, empty for none); measure writes TensorBoard metrics and a profiler trace;
-at the end node 0 writes the stage summaries, the monitor summary and the measure trace report.
+at the end node 0 writes the stage summaries, the monitor summary, the NCCL variant comparison and the measure trace
+report.
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
 MN_ROWS (only these matrix rows), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
@@ -167,7 +169,21 @@ def build_tasks() -> list[dict]:
             if st == "smoke" and r["nosmoke"]:
                 continue
             tasks.append(dict(id=f"{m}.{st}.{r['name']}", kind="cell", model=m, stage=st, **r))
-    return tasks
+    return tasks + comm_variants()
+
+
+def comm_variants() -> list[dict]:
+    """The NCCL tuning variants of comm_sweep.tsv as comm tasks after the matrix; MN_COMM_SWEEP=0 leaves them out."""
+    if ENV.get("MN_COMM_SWEEP", "1") != "1":
+        return []
+    out = []
+    for line in (K / "comm_sweep.tsv").read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        tag, _, rest = line.partition("\t")
+        envs = dict(item.split("=", 1) for item in rest.split())
+        out.append(dict(id=f"comm.{tag}", kind="comm", tag=tag, envs=envs))
+    return out
 
 
 def load_tasks() -> list[dict]:
@@ -258,6 +274,8 @@ def run_attempt(t: dict, idx: int, a: int, seq: int) -> int:
     env = dict(ENV)
     env["MN_PORT"] = str(MASTER_PORT + 1 + (idx * 16 + a) % 3000)
     if t["kind"] == "comm":
+        env.update(t.get("envs", {}))
+        env["MN_COMM_TAG"] = t.get("tag", "")
         cmd = ["bash", str(K / "run_comm.sh")]
     else:
         env.update(cell_env(t, seq))
@@ -502,6 +520,7 @@ def finish(tasks: list[dict]) -> None:
                 subprocess.call([sys.executable, str(K / "summarize.py"), str(stage_dir)], stdout=f)
     with open(S / "report.log", "a") as f:
         subprocess.call([sys.executable, str(K / "monitor.py"), "--summary"], stdout=f, stderr=subprocess.STDOUT)
+        subprocess.call([sys.executable, str(K / "comm_compare.py"), str(OUT / HW)], stdout=f, stderr=subprocess.STDOUT)
         if (OUT / HW / "measure").is_dir():
             subprocess.call(
                 [sys.executable, str(K / "trace_report.py"), str(OUT / HW / "measure")], stdout=f, stderr=subprocess.STDOUT

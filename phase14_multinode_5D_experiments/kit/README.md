@@ -2,7 +2,7 @@
 
 2026-10-28，CPU 会话按 `../multinode.md` 准备（用户："把里面设置的对应titan脚本和新开的titan实验分支全部准备好，里面还缺一个配置，A100 80G；准备两个模型Kimi K3 downscale和Minimax M3 downscale"）。
 
-**本 kit 一步都还没跑过。** 代码只在 Windows 上做了 `py_compile` 和 black；titan 的模块在本机 import 不了（`models/common` 要 CuTeDSL），第一次上机先跑 smoke。
+**完整流程（Together k8s 上从开集群到出结果、每种并行配置的命令、profiler、NCCL / RDMA 调优）看 `PLAYBOOK.md`。** **本 kit 一步都还没跑过。** 代码只在 Windows 上做了 `py_compile` 和 black；titan 的模块在本机 import 不了（`models/common` 要 CuTeDSL），第一次上机先跑 smoke。
 
 ## 1. titan 分支
 
@@ -114,6 +114,9 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `summarize.py` | 解析日志，出每格一行的 TSV |
 | `trace_report.py`、`merge_traces.py` | 每格 trace 的时间拆分（计算、按进程组的暴露通信、拷贝、空闲，并入 tps、MFU、显存和 IB 速率）；一格所有 rank 合成一份 Perfetto trace |
 | `monitor.py` | 每个节点的 GPU 和 IB 采样器；`--show` 看最新一次，`--summary` 按任务汇总 |
+| `PLAYBOOK.md` | 完整流程：步骤、每种并行配置的命令、profiler、NCCL / RDMA 验证和调优 |
+| `rdma_bw.sh` | 每个 IB 口的 RDMA 原始带宽（perftest 的 `ib_write_bw`，不经过 NCCL），`run_comm.sh` 先跑它 |
+| `comm_sweep.tsv`、`comm_compare.py` | NCCL 调优变体（每行一个设置）；各变体和 NCCL 默认选择的 α、busbw 对比 |
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
 | `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
 | `run_comm.sh` | 两台一起：comm_bench 加 NCCL INFO 日志，判断走 IB 还是 socket、有没有 GPUDirect RDMA，列出大消息 busbw |

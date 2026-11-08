@@ -63,7 +63,7 @@ export NODE_RANK=0                   # node 1 上写 1
 bash $KIT/run_comm.sh
 ```
 
-输出在 `~/p14/runs/$HW/comm/`。`verdict_node<k>.txt` 写着 NCCL 走的是 IB 还是 socket、跨节点有没有用上 GPUDirect RDMA；node 0 还会列出大消息的 busbw（`world` 是 16 卡，`node` 是单节点 8 卡，`cross_node` / `same_node` 是 sendrecv）。这一步能通，第 5 步以后的多节点运行就能通。有 MPI 和节点间 ssh 的话，再在 node 0 上跑 `NODE0=... NODE1=... bash $KIT/nccl_tests.sh`，表里的 E2 用 nccl-tests 的数。
+它先用 `ib_write_bw` 测每个 IB 口的 RDMA 原始带宽，再跑 NCCL。输出在 `~/p14/runs/$HW/comm/`。要试一个 NCCL 设置，两台一起跑 `MN_COMM_TAG=ring NCCL_ALGO=Ring bash $KIT/run_comm.sh`（变体见 `comm_sweep.tsv`），再在 node 0 上 `python $KIT/comm_compare.py ~/p14/runs/$HW` 对比。`verdict_node<k>.txt` 写着 NCCL 走的是 IB 还是 socket、跨节点有没有用上 GPUDirect RDMA；node 0 还会列出大消息的 busbw（`world` 是 16 卡，`node` 是单节点 8 卡，`cross_node` / `same_node` 是 sendrecv）。这一步能通，第 5 步以后的多节点运行就能通。有 MPI 和节点间 ssh 的话，再在 node 0 上跑 `NODE0=... NODE1=... bash $KIT/nccl_tests.sh`，表里的 E2 用 nccl-tests 的数。
 
 ## 5. smoke（两台一起，每个模型一次）
 

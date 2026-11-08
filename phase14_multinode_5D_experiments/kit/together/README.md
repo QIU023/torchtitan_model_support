@@ -7,7 +7,7 @@
 - [preemptible compute](https://docs.together.ai/docs/preemptible-compute)
 - [health checks](https://docs.together.ai/docs/health-checks)
 
-**还没在 Together 上跑过。** pod 起来以后的流程见 `../K8S_RUN.md`。
+**还没在 Together 上跑过。** 完整流程见 `../PLAYBOOK.md`，这里只放建集群的细节和依据。
 
 ## 0. 和 Nebius 不一样的地方
 
@@ -49,7 +49,7 @@ kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
 bash phase14_multinode_5D_experiments/kit/k8s.sh status
 ```
 
-之后按 `../K8S_RUN.md` 操作。
+之后按 `../PLAYBOOK.md` 第 4 节以后操作。
 
 ## 4. `InfiniBand: NO` 时
 

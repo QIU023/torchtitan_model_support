@@ -8,10 +8,14 @@
 #   k8s.sh kill                stop now: the current attempt is killed and will be rerun later
 #   k8s.sh start               start the pipeline again (after stop or kill)
 #   k8s.sh retask              kill, forget the frozen task list (finished tasks stay finished), start; picks up
-#                              matrix edits made with sync
+#                              matrix edits made with sync and a scope set with scope
+#   k8s.sh scope [VAR=value ...]   override the manifest's MN_* values (MN_ROWS, MN_MODELS, MN_STAGES, MN_ORDER,
+#                              MN_COMM_SWEEP, ...) from the next retask on; no argument clears the override
 #   k8s.sh sync                copy this kit directory to the shared filesystem; scripts take effect at the next
 #                              attempt, matrix edits after retask
 #   k8s.sh collect [dir]       copy the results (no traces, no caches) to dir and summarize every stage
+#   k8s.sh comm                communication verdicts (IB, GPUDirect RDMA, raw RDMA per port, busbw, alpha-beta) and
+#                              the comparison of the NCCL tuning variants
 #   k8s.sh top                 latest GPU (utilization, memory, power, SM clock) and InfiniBand rates of every node
 #   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
 #                              communication by process group / idle from the traces, InfiniBand rates
@@ -113,6 +117,19 @@ case "${1:-status}" in
       "${PYTHON:-python3}" "$HERE/kit/summarize.py" "$stage" > "$stage/summary.tsv" && echo "== $stage" && cat "$stage/summary.tsv"
     done
     echo "results in $dest" ;;
+  scope)
+    shift
+    if [ $# = 0 ]; then
+      on "$(any)" "rm -f $BASE/scope.env"
+      echo "scope cleared: the manifest's values apply from the next retask"
+    else
+      printf 'export %q\n' "$@" | kubectl exec -i -n "$NS" "$(any)" -- bash -c "cat > $BASE/scope.env"
+      on "$(any)" "cat $BASE/scope.env"
+      echo "takes effect at the next retask"
+    fi ;;
+  comm)
+    on "$(any)" "for h in $RUNS/*/; do [ -d \${h}comm ] || continue; echo \"== \$h\"
+      cat \${h}comm/verdict_node*.txt; $PY $KIT/comm_compare.py \$h; done; true" ;;
   top)
     on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS" ;;
   report)

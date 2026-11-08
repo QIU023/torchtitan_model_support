@@ -1,0 +1,11 @@
+# tag	NCCL variables of one comm_bench run (pipeline.py runs every row after the matrix unless MN_COMM_SWEEP=0;
+# comm_compare.py sets each against the run with NCCL's own choices). One run takes about two minutes on 16 GPUs.
+ring	NCCL_ALGO=Ring
+nvls_off	NCCL_NVLS_ENABLE=0
+simple	NCCL_PROTO=Simple
+ll	NCCL_PROTO=LL
+no_ll128	NCCL_PROTO=^LL128
+gdr_off	NCCL_NET_GDR_LEVEL=LOC
+qps4	NCCL_IB_QPS_PER_CONNECTION=4
+chunk512k	NCCL_P2P_NET_CHUNKSIZE=524288
+channels32	NCCL_MIN_NCHANNELS=32

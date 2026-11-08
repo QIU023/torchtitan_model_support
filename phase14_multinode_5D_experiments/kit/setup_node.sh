@@ -1,13 +1,14 @@
 #!/bin/bash
 # Per container, on every start (bootstrap.sh runs it; setup.sh too): the system packages a fresh container image
-# lacks, then an interconnect report. Packages: git, a C compiler for Triton's launcher, and the InfiniBand user-space
-# libraries NCCL loads (without libibverbs and the mlx5 provider NCCL silently falls back to TCP sockets).
+# lacks, then an interconnect report. Packages: git, a C compiler for Triton's launcher, the InfiniBand user-space
+# libraries NCCL loads (without libibverbs and the mlx5 provider NCCL silently falls back to TCP sockets), and
+# perftest for the raw RDMA bandwidth check (rdma_bw.sh).
 set -x
 if command -v apt-get >/dev/null && [ "$(id -u)" = 0 ]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y --no-install-recommends git curl ca-certificates build-essential rsync tmux iproute2 procps \
-    rdma-core ibverbs-providers libibverbs1 ibverbs-utils infiniband-diags
+    rdma-core ibverbs-providers libibverbs1 ibverbs-utils infiniband-diags perftest
 fi
 # The clone and the worktree on a shared filesystem may belong to another uid than this container's user.
 git config --global --add safe.directory '*' 2>/dev/null

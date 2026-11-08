@@ -80,6 +80,9 @@ spec:
           value: ""
         - name: MN_ORDER
           value: row
+        # "0" leaves out the NCCL tuning runs of comm_sweep.tsv after the matrix (about 20 minutes).
+        - name: MN_COMM_SWEEP
+          value: "1"
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: compute,utility
         - name: HF_TOKEN

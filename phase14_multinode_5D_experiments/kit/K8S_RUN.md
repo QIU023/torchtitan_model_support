@@ -1,6 +1,6 @@
 # k8s 上两个 pod 的无人值守流程（Nebius、Together 共用，2026-11-07）
 
-集群和 pod 怎么准备，见 `nebius/README.md` 或 `together/README.md`。pod 起来以后的事，两家一样，都在这里。**这套流程只在本机模拟过两个节点的协同（正常完成、probe OOM 减半、任意一个节点中途被杀再重启），还没在真集群上跑过。**
+完整流程从 `PLAYBOOK.md` 开始，这里是运维细节。集群和 pod 怎么准备，见 `nebius/README.md` 或 `together/README.md`。pod 起来以后的事，两家一样，都在这里。**这套流程只在本机模拟过两个节点的协同（正常完成、probe OOM 减半、任意一个节点中途被杀再重启），还没在真集群上跑过。**
 
 ## 1. pod 起来后自动做什么
 
@@ -27,7 +27,7 @@ bash $K8S collect      # 结果拉回本机（不含 trace 和 cache），每个
 ```
 
 - **改矩阵**（长度、加行、额外变量）：在本地改 `kit/matrix_*.tsv`，然后 `bash $K8S sync`，再 `bash $K8S retask`。已经完成的任务不会重跑；要重跑某一格，先删掉 `pipeline/done/<任务名>`（放弃过的删 `giveup/` 和 `fails/` 里的同名文件），再 `retask`。
-- **改范围**（清单里的 `MN_ROWS`、`MN_MODELS`、`MN_ORDER`、`HW`）：改完清单后 `kubectl delete job p14`，再 `kubectl apply -f <清单>`，最后 `bash $K8S retask`。状态都在共享存储上，删 Job 不会丢。
+- **改范围**（`MN_ROWS`、`MN_MODELS`、`MN_STAGES`、`MN_ORDER`、`MN_COMM_SWEEP`）：`bash $K8S scope MN_ROWS='k3_5d k3_B' MN_MODELS=k3`，再 `bash $K8S retask`；`bash $K8S scope` 不带参数是撤销。要改 `HW` 这类清单里的值，就改完清单后 `kubectl delete job p14`，再 `kubectl apply -f <清单>`，最后 `retask`。状态都在共享存储上，删 Job 不会丢。
 - **改脚本**（`launch.sh`、`run_comm.sh` 等）：`bash $K8S sync` 即可，从下一次尝试开始生效。titan 分支有新提交时（`env.sh` 的 `BRANCH_SHA` 变了），`sync` 之后再 `retask`：bootstrap 发现树不在这个提交上，会重跑 setup，把树切过去。
 - **停和启：**
   - `bash $K8S stop`：当前这次尝试跑完再停（两个节点都退出，任务的进度保留）；
