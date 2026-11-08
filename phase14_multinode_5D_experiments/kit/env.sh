@@ -37,11 +37,16 @@ esac
 
 # MN_NET=nebius: a Nebius GPU cluster (pods or VMs); the settings of Nebius's own NCCL test (docs.nebius.com,
 # kubernetes/gpu/nccl-test): bootstrap on eth0, data on the mlx5 InfiniBand HCAs.
-if [ "${MN_NET:-}" = nebius ]; then
-  MN_IFNAME=${MN_IFNAME:-eth0}
-  MN_IB_HCA=${MN_IB_HCA:-mlx5}
-  export UCX_NET_DEVICES=${UCX_NET_DEVICES:-eth0} SHARP_COLL_ENABLE_PCI_RELAXED_ORDERING=1 NCCL_COLLNET_ENABLE=0
-fi
+# MN_NET=together: a Together GPU cluster; its docs give no NCCL settings, so bootstrap on the pod's eth0 and let NCCL
+# find the HCAs (run_comm.sh lists the ones it used; set MN_IB_HCA if a RoCE front-end port shows up among them).
+case "${MN_NET:-}" in
+  nebius)
+    MN_IFNAME=${MN_IFNAME:-eth0}
+    MN_IB_HCA=${MN_IB_HCA:-mlx5}
+    export UCX_NET_DEVICES=${UCX_NET_DEVICES:-eth0} SHARP_COLL_ENABLE_PCI_RELAXED_ORDERING=1 NCCL_COLLNET_ENABLE=0 ;;
+  together)
+    MN_IFNAME=${MN_IFNAME:-eth0} ;;
+esac
 
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
 # Cluster specific, set before the first run (RUNBOOK.md step 3): the interface both nodes reach each other on, and the
@@ -49,3 +54,5 @@ export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
 [ -n "${MN_IFNAME:-}" ] && export NCCL_SOCKET_IFNAME=$MN_IFNAME GLOO_SOCKET_IFNAME=$MN_IFNAME
 [ -n "${MN_IB_HCA:-}" ] && export NCCL_IB_HCA=$MN_IB_HCA
 export UV_CACHE_DIR=${UV_CACHE_DIR:-$B/.uvcache}
+# The venv's interpreter lives under $B too, so a venv on a shared filesystem works in every pod and after restarts.
+export UV_PYTHON_INSTALL_DIR=${UV_PYTHON_INSTALL_DIR:-$B/uv-python}

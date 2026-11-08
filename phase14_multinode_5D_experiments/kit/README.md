@@ -73,6 +73,8 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 
 ## 4. 步骤
 
+**k8s（Nebius、Together）上不用手动跑这些步骤**：pod 起来以后，流水线会自动依次跑完，被抢占也能续上，见 `K8S_RUN.md` 和 `nebius/README.md`、`together/README.md`。下面是裸机或 VM 上手动跑的概要。
+
 逐条可复制的命令在 `RUNBOOK.md`（2026-10-29），这里是概要。两台机器都要执行同一条命令（`NODE_RANK` 不同），或者用 `srun` 每节点一个任务。下面的 `kit` 指本目录。`HW` 除了 `h100` / `h200` / `a100`，还有 `generic`（比如 vast 上的 8×5090），只做通信和 smoke。
 
 1. 每个节点：`HW=h100 bash kit/setup.sh`（A100 用 `HW=a100`）。看到 `SETUP_OK`，并核对 `nvidia-smi` 的卡型和 compute capability（A100 应是 `A100-SXM4-80GB`、`8.0`，见 multinode.md §9.6）。
@@ -111,6 +113,12 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
 | `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
 | `run_comm.sh` | 两台一起：comm_bench 加 NCCL INFO 日志，判断走 IB 还是 socket、有没有 GPUDirect RDMA，列出大消息 busbw |
-| `nebius/README.md`、`nebius/p14_pods.yaml`、`nebius/k8s.sh` | Nebius 同一个 GPU cluster 的两个 pod：操作流程、pod 清单（Indexed Job + headless Service）、本机驱动两个 pod 的脚本 |
+| `K8S_RUN.md` | k8s 上两个 pod 的无人值守流程（Nebius、Together 共用）：自动做什么、手动操作、状态文件、抢占 |
+| `nebius/README.md`、`nebius/p14_pods.yaml` | Nebius：建 GPU cluster、共享文件系统、node group 和 CSI，pod 清单 |
+| `together/README.md`、`together/p14_pods.yaml` | Together：建集群、kubeconfig、共享卷，pod 清单 |
+| `k8s.sh` | 本机操控两个 pod：status、logs、stop / kill / start、sync、retask、collect、both |
+| `bootstrap.sh` | pod 的入口：容器包、共享 setup（加锁）、流水线（崩了自动重启） |
+| `pipeline.py` | 无人值守流水线：comm、tokenizer、每行 smoke / probe / warm / measure；断点续跑、OOM 自动减半、两节点心跳协同 |
+| `setup_node.sh`、`assets.sh` | 每个容器的系统包和 IB 报告；两个模型的 tokenizer（K3 转换失败时退到 Qwen3） |
 | `nccl_tests.sh`、`comm_bench.py` | busbw：nccl-tests（主）和 torch.distributed（备） |
 | `make_kimi_tokenizer.py` | 把 Kimi K3 的 tiktoken 转成 `tokenizer.json` |

@@ -11,6 +11,8 @@
 本 phase 的文件：
 - `multinode.md`：用户放进来的纸面规划（K3 缩小版在 2 × 8 卡 H100 / H200 上的 5 种组合，§9 是 A100 80GB）；
 - `kit/`：按规划准备的脚本，对应 titan 实验分支 `phase14_multinode_5d`（`ac36e017b`），加了 A100 80GB 的配置和 MiniMax M3 缩小版，说明见 `kit/README.md`。
+  - 租裸机或 VM：按 `kit/RUNBOOK.md` 手动逐步跑；
+  - Nebius 或 Together 的 k8s：按 `kit/nebius/README.md` 或 `kit/together/README.md` 建集群、拉起两个 pod，之后流水线自动跑完全部阶段，被抢占后能接着跑（`kit/K8S_RUN.md`）。这条路只在本机模拟过，还没在真集群上跑过。
 - `VAST_A100_SEARCH_2026-10-28.md`：vast.ai 多节点的配置方法，以及找 2 × 8 A100 的结果（当时租不到）。
 
 约定（沿用前几个 phase）：

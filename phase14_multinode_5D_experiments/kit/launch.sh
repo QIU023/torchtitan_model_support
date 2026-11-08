@@ -1,5 +1,5 @@
 #!/bin/bash
-# One cell on NNODES x NPROC GPUs. Run the same command on every node (kit/nebius/k8s.sh does it for the two pods).
+# One cell on NNODES x NPROC GPUs. Run the same command on every node (on the k8s pods, pipeline.py does it).
 # Usage: launch.sh <run_dir>. Reads the MN_* variables of torchtitan_recipes/multinode_5d.py, plus MASTER_ADDR
 # (node 0), MN_PORT (rendezvous port; run_matrix.sh gives every cell its own) and MN_CACHE (compile cache shared by
 # the cells of one table). Static rendezvous: node 0 hosts the store and global rank = NODE_RANK * NPROC + local rank,

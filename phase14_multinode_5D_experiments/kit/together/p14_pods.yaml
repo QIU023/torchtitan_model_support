@@ -1,0 +1,117 @@
+# Phase 14 on a Together GPU cluster (Kubernetes): two pods, one per 8-GPU node, both mounting the cluster's shared
+# volume (together/README.md). kubectl apply -f p14_pods.yaml
+# Before applying: set volumeName to your shared volume's name (kubectl get pv; Together creates a static PV with the
+# same name as the shared volume), HW (h100 / h200 / b200) and the MN_* settings.
+# Each pod clones the kit onto the shared volume once, then runs kit/bootstrap.sh: packages, the shared setup, and
+# the unattended pipeline, which resumes where it stopped after a preemption (state on the shared volume). The
+# Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
+# Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). Together documents no RDMA settings for pods; the container
+# is privileged so NCCL can reach the HCAs, and the pipeline's first task (comm) reports whether it did.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: p14-shared
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: SHARED_VOLUME_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: p14
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    job-name: p14
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: p14
+spec:
+  completionMode: Indexed
+  completions: 2
+  parallelism: 2
+  # Preempted pods are replaced when Together brings a node back; the pipeline state lives on the shared volume.
+  backoffLimit: 1000
+  template:
+    spec:
+      subdomain: p14
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # Pin to the preemptible nodes if the cluster also has a standard node:
+      # nodeSelector:
+      #   together.ai/compute-class: preemptible
+      # If the comm task reports "InfiniBand: NO", try the node's network namespace (then set MN_IFNAME below to the
+      # node interface that `ip -4 addr` shows inside the pod):
+      # hostNetwork: true
+      # dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: main
+        image: nvidia/cuda:12.8.1-devel-ubuntu22.04
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -x
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+          mkdir -p $MN_BASE
+          L=$MN_BASE/logbook
+          if [ ! -d $L/.git ]; then
+            rm -rf $L.tmp.$HOSTNAME
+            git clone --depth 1 --filter=blob:none --sparse https://github.com/QIU023/torchtitan_model_support.git $L.tmp.$HOSTNAME
+            git -C $L.tmp.$HOSTNAME sparse-checkout set phase14_multinode_5D_experiments
+            mv -T $L.tmp.$HOSTNAME $L || rm -rf $L.tmp.$HOSTNAME
+          fi
+          exec bash $L/phase14_multinode_5D_experiments/kit/bootstrap.sh
+        env:
+        - name: HW
+          value: h200
+        - name: MN_NET
+          value: together
+        - name: MN_BASE
+          value: /mnt/shared/p14
+        - name: MASTER_ADDR
+          value: p14-0.p14
+        # Pipeline scope: empty MN_ROWS runs every matrix row; MN_ROWS=k3_5d runs the 5D cell through all stages.
+        - name: MN_MODELS
+          value: "k3 m3"
+        - name: MN_ROWS
+          value: ""
+        - name: MN_ORDER
+          value: row
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: compute,utility
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token
+              key: token
+              optional: true
+        resources:
+          limits:
+            nvidia.com/gpu: 8
+          requests:
+            nvidia.com/gpu: 8
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["IPC_LOCK"]
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+        - name: shared
+          mountPath: /mnt/shared
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 256Gi
+      - name: shared
+        persistentVolumeClaim:
+          claimName: p14-shared

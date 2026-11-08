@@ -2,7 +2,7 @@
 
 照着从上往下复制粘贴。**node 0**、**node 1** 标的是在哪台机器上执行；"两台"表示两台都要执行，而且同一步要在一两分钟内一起开始（torchrun 会等另一台来 rendezvous）。
 
-**Nebius 上同一个 GPU cluster 的两个 k8s pod，不看这一份，看 `nebius/README.md`**：pod 由 `nebius/p14_pods.yaml` 拉起，命令由本机的 `nebius/k8s.sh` 同时发给两个 pod，不需要 ssh 和 tmux。
+**Nebius 或 Together 的 k8s pod，不看这一份**：先按 `nebius/README.md` 或 `together/README.md` 建集群、拉起 pod，pod 起来以后流水线会自动跑完全部阶段（`K8S_RUN.md`），本机用 `k8s.sh` 看进度、收结果。
 
 ## 0. 先确定租什么
 

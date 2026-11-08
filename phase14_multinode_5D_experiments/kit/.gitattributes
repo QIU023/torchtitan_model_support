@@ -1,0 +1,2 @@
+# The kit runs on Linux and k8s.sh sync copies this working copy into the pods: LF on Windows checkouts too.
+* text=auto eol=lf

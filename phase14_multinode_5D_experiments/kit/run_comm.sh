@@ -1,5 +1,5 @@
 #!/bin/bash
-# Multi-node communication check; run the same command on both nodes (kit/nebius/k8s.sh comm does it for the pods).
+# Multi-node communication check; run the same command on both nodes (on the k8s pods, pipeline.py runs it first).
 # comm_bench.py over all NNODES x NPROC ranks with NCCL_DEBUG=INFO, then a verdict from this node's NCCL log:
 # which transport NCCL picked (IB or TCP sockets), whether the inter-node channels use GPUDirect RDMA, and on node 0
 # the busbw of the large messages. Output in $OUT/$HW/comm/.

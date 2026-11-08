@@ -1,9 +1,21 @@
-# Two pods for the phase 14 kit, one per node, on a Nebius Managed Kubernetes node group attached to a GPU cluster
-# (InfiniBand). kubectl apply -f p14_pods.yaml; delete with kubectl delete -f p14_pods.yaml (pods lose their files).
-# An Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
-# Service p14 makes p14-0.p14 resolvable, which is MASTER_ADDR. Rendezvous and NCCL bootstrap run on the pod
-# network (eth0); NCCL data runs on the mlx5 HCAs, reachable because the container is privileged (as in Nebius's
-# NCCL test). Each container clones the kit, runs setup.sh, then idles; work is started with kit/nebius/k8s.sh.
+# Phase 14 on Nebius Managed Kubernetes: two pods, one per node, on a node group attached to a GPU cluster
+# (InfiniBand) and to a shared filesystem (nebius/README.md, steps 1-2). kubectl apply -f p14_pods.yaml
+# Each pod clones the kit onto the shared filesystem once, then runs kit/bootstrap.sh: packages, the shared setup,
+# and the unattended pipeline, which resumes where it stopped after a preemption (state on the shared filesystem).
+# The Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
+# Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). The container is privileged so NCCL reaches the mlx5 HCAs,
+# as in Nebius's NCCL test. Edit HW (h100 / h200 / b200) and the MN_* settings below before applying.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: p14-shared
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: csi-mounted-fs-path-sc
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -22,7 +34,8 @@ spec:
   completionMode: Indexed
   completions: 2
   parallelism: 2
-  backoffLimit: 0
+  # Preempted pods are replaced; the pipeline state lives on the shared filesystem.
+  backoffLimit: 1000
   template:
     spec:
       subdomain: p14
@@ -42,19 +55,31 @@ spec:
           set -x
           export DEBIAN_FRONTEND=noninteractive
           apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/QIU023/torchtitan_model_support.git /root/logbook
-          git -C /root/logbook sparse-checkout set phase14_multinode_5D_experiments
-          bash /root/logbook/phase14_multinode_5D_experiments/kit/setup.sh
-          sleep infinity
+          mkdir -p $MN_BASE
+          L=$MN_BASE/logbook
+          if [ ! -d $L/.git ]; then
+            rm -rf $L.tmp.$HOSTNAME
+            git clone --depth 1 --filter=blob:none --sparse https://github.com/QIU023/torchtitan_model_support.git $L.tmp.$HOSTNAME
+            git -C $L.tmp.$HOSTNAME sparse-checkout set phase14_multinode_5D_experiments
+            mv -T $L.tmp.$HOSTNAME $L || rm -rf $L.tmp.$HOSTNAME
+          fi
+          exec bash $L/phase14_multinode_5D_experiments/kit/bootstrap.sh
         env:
         - name: HW
-          value: h100
+          value: h200
         - name: MN_NET
           value: nebius
         - name: MN_BASE
-          value: /root/p14
+          value: /mnt/shared/p14
         - name: MASTER_ADDR
           value: p14-0.p14
+        # Pipeline scope: empty MN_ROWS runs every matrix row; MN_ROWS=k3_5d runs the 5D cell through all stages.
+        - name: MN_MODELS
+          value: "k3 m3"
+        - name: MN_ROWS
+          value: ""
+        - name: MN_ORDER
+          value: row
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: compute,utility
         - name: HF_TOKEN
@@ -79,12 +104,13 @@ spec:
         volumeMounts:
         - name: dshm
           mountPath: /dev/shm
-        - name: work
-          mountPath: /root/p14
+        - name: shared
+          mountPath: /mnt/shared
       volumes:
       - name: dshm
         emptyDir:
           medium: Memory
           sizeLimit: 256Gi
-      - name: work
-        emptyDir: {}
+      - name: shared
+        persistentVolumeClaim:
+          claimName: p14-shared
