@@ -25,6 +25,9 @@
 #   k8s.sh trace <stage> <row> [dir]   one cell's ranks merged into one trace in dir, for ui.perfetto.dev
 #   k8s.sh tb [stage]          TensorBoard of a stage (measure) on pod 0, forwarded to localhost:6006
 #   k8s.sh fetch <path> [dir]  copy a file or directory under runs/ to dir (memory snapshots, raw traces)
+#   k8s.sh cell <stage> <row> [VAR=value ...]   one cell by hand on both pods, with the pipeline's settings for that
+#                              stage and row (plus overrides such as MN_SEQ=16384), into runs/<hw>/manual/<stage>/;
+#                              waits for it, printing the newest step, then prints its summary (stop the pipeline first)
 #   k8s.sh both '<command>'    one command in both pods at once, detached (manual work; stop the pipeline first)
 # Environment: NS (default), JOB (p14), BASE (/mnt/shared/p14, MN_BASE in the manifest), PYTHON (python3).
 set -euo pipefail
@@ -187,6 +190,32 @@ case "${1:-status}" in
     mkdir -p "$dest"
     kubectl exec -n "$NS" "$(any)" -- tar -C $RUNS -cf - "${2:?path under runs/}" | tar -C "$dest" -xf -
     echo "copied $2 to $dest" ;;
+  cell)
+    stage=${2:?stage: smoke, probe, warm or measure}
+    row=${3:?row of matrix_k3.tsv or matrix_m3.tsv, such as k3_5d}
+    shift 3
+    for p in $(pods); do
+      if on "$p" "pgrep -f 'pipelin[e].py|torchtita[n].train' > /dev/null"; then
+        echo "$p: a pipeline or a training run is active; k8s.sh stop (or kill) first" >&2
+        exit 1
+      fi
+    done
+    name=${row}_$(date +%m%d_%H%M%S)
+    d="$RUNS/\$HW/manual/$stage/$name"
+    port=$((29700 + RANDOM % 200))
+    cmd="d=$d
+{ [ ! -f $BASE/scope.env ] || . $BASE/scope.env; . $KIT/env.sh
+  export B OUT HW GATE FLAVOR_k3 FLAVOR_m3 ASSETS_k3 ASSETS_m3
+  eval \"\$($PY $KIT/pipeline.py --cell-env ${row%%_*} $stage $row)\" && export MN_PORT=$port $* && bash $KIT/launch.sh \$d; } ||
+{ mkdir -p \$d; [ -f \$d/rc_node\$NODE_RANK ] || echo 99 > \$d/rc_node\$NODE_RANK; }"
+    detached "cell_${stage}_$name" "$cmd"
+    echo "$stage $row on both pods, in $d; ctrl-c stops watching, not the run (k8s.sh kill stops it)"
+    until on "$(any)" "[ -f $d/rc_node0 ] && [ -f $d/rc_node1 ]"; do
+      sleep 20
+      on "$(any)" "grep -h 'step:' $d/node*.log 2>/dev/null | tail -n 1 | sed 's/\x1b\[[0-9;]*m//g'; true"
+    done
+    on "$(any)" "echo \"rc: \$(cat $d/rc_node0) \$(cat $d/rc_node1)\"; grep -h 'multinode_5d\]' $d/node0.log | head -n 1
+      $PY $KIT/summarize.py \$(dirname $d) | grep -E '^cell|^$name'; true" ;;
   both)
     detached "both_$(date +%H%M%S)" "${2:?command}" ;;
   *)

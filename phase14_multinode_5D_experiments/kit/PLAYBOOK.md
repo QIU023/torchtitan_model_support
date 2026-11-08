@@ -159,6 +159,16 @@ k3_5d_vpp	pp=2,dp=2,cp=2,tp=2,ep=8	32768	16384	24576	MN_SCHEDULE=Interleaved1F1B
 
 要重跑一个已完成的任务，先删掉共享卷上 `runs/<hw>/pipeline/done/<任务名>`，再 `retask`。
 
+**按行手动逐格跑**（流水线先 `stop` 或 `kill`）：`bash $K8S cell <阶段> <行名> [VAR=值 ...]` 用流水线对这一行这一阶段的同一套设置（tokenizer、长度、NCCL 网卡、显存快照、trace），在两个 pod 上同时跑一格，跑完打印退出码和这一格的 `summary`，期间每 20 秒打印最新一步。结果写在 `runs/<hw>/manual/<阶段>/<行名>_<时间>/`，measure 的拆分用 `bash $K8S report manual/measure`。手动跑时 probe 不会自动减半：OOM 了就加 `MN_SEQ=<一半>` 重跑，warm 和 measure 也带上同样的 `MN_SEQ`。
+
+```sh
+bash $K8S cell smoke k3_5d
+bash $K8S cell probe k3_5d
+bash $K8S cell warm k3_5d
+bash $K8S cell measure k3_5d
+bash $K8S cell probe k3_B MN_SEQ=32768     # 例：长度减半重跑
+```
+
 **任意度数手动跑一格**（不进矩阵）：先 `bash $K8S stop`，等当前这次尝试结束，再让两个 pod 同时执行：
 
 ```sh

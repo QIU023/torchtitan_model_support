@@ -20,6 +20,7 @@ PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops both nodes once the current atte
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -559,5 +560,20 @@ def main() -> int:
     return 0
 
 
+def print_cell_env(model: str, stage: str, row: str) -> int:
+    """Shell exports of one cell's settings, as the pipeline would run it (k8s.sh cell runs a cell by hand)."""
+    rows = [r for r in matrix_rows(model) if r["name"] == row]
+    if not rows or stage not in ("smoke", "probe", "warm", "measure"):
+        print(f"echo 'no row {row} in matrix_{model}.tsv, or stage {stage} unknown' >&2; false")
+        return 1
+    t = dict(id=f"{model}.{stage}.{row}", kind="cell", model=model, stage=stage, **rows[0])
+    seq = 0 if stage == "smoke" else int(read(mark("len", f"{model}.{row}")) or rows[0]["seq"])
+    for k, v in cell_env(t, seq).items():
+        print(f"export {k}={shlex.quote(v)}")
+    return 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 5 and sys.argv[1] == "--cell-env":
+        sys.exit(print_cell_env(*sys.argv[2:]))
     sys.exit(main())
