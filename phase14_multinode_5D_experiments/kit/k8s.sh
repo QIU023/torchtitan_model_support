@@ -20,6 +20,8 @@
 #                              memory, power, NVLink and PCIe rates), with the newest step line (loss, memory, tps,
 #                              tflops, mfu) of the cell the node runs
 #   k8s.sh watch [seconds]     top again every 5 (or the given) seconds until ctrl-c
+#   k8s.sh dash                live dashboard on pod 0, forwarded to http://localhost:8765: MFU and tps per step,
+#                              every rank's latest step, every GPU from DCGM, the comm verdict, the cell's profiler files
 #   k8s.sh tail [0|1] [steps]  follow the newest cell's training log of node 0 (ranks 0-7) or node 1 (ranks 8-15);
 #                              with steps, only the step lines (loss, memory, tps, tflops, mfu)
 #   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
@@ -158,15 +160,26 @@ case "${1:-status}" in
   comm)
     on "$(any)" "for h in $RUNS/*/; do [ -d \${h}comm ] || continue; echo \"== \$h\"
       cat \${h}comm/verdict_node*.txt; $PY $KIT/comm_compare.py \$h; done; true" ;;
+  dash)
+    p=$(pod 0)
+    # Stopped in an exec of its own: pkill would match the shell whose command line starts the new one.
+    on "$p" "pkill -f 'dashboar[d].py'; true"
+    on "$p" "setsid nohup $PY $KIT/dashboard.py --port 8765 --out $RUNS --dcgm '$(dcgm_map)' \
+      > /tmp/p14_dash.log 2>&1 < /dev/null & true"
+    sleep 3
+    echo "dashboard on $p: open http://localhost:8765 (ctrl-c ends the forward; the dashboard keeps running in the pod)"
+    kubectl port-forward -n "$NS" "$p" 8765:8765 ;;
   tail)
+    # Followed in the pod that writes the log: another pod's NFS client keeps a stale size for a followed file.
     n=${2:-0}
-    f=$(on "$(any)" "ls -t $RUNS/*/*/*/node$n.log $RUNS/*/manual/*/*/node$n.log 2>/dev/null | head -n 1")
+    p=$(pod "$n")
+    f=$(on "$p" "ls -t $RUNS/*/*/*/node$n.log $RUNS/*/manual/*/*/node$n.log 2>/dev/null | head -n 1")
     [ -n "$f" ] || { echo "no node$n.log yet" >&2; exit 1; }
-    echo "== $f (ctrl-c to stop)"
+    echo "== $f on $p (ctrl-c to stop)"
     if [ "${3:-}" = steps ]; then
-      kubectl exec -n "$NS" "$(any)" -- bash -c "tail -n +1 -f $f | grep --line-buffered 'step:'"
+      kubectl exec -n "$NS" "$p" -- bash -c "tail -n +1 -F $f | grep --line-buffered 'step:'"
     else
-      kubectl exec -n "$NS" "$(any)" -- tail -n 50 -f "$f"
+      kubectl exec -n "$NS" "$p" -- tail -n 50 -F "$f"
     fi ;;
   top)
     on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS --dcgm '$(dcgm_map)'" ;;
@@ -192,8 +205,9 @@ case "${1:-status}" in
     echo "$dest/${row}_${stage}_trace.json.gz: open it in https://ui.perfetto.dev" ;;
   tb)
     p=$(pod 0)
-    on "$p" "pkill -f 'tensorboar[d] --logdir'; logdir=\$(ls -d $RUNS/*/${2:-measure} | head -n 1)
-      setsid nohup $BASE/venv/bin/tensorboard --logdir \$logdir --host 127.0.0.1 --port 6006 > /tmp/p14_tb.log 2>&1 < /dev/null &"
+    on "$p" "pkill -f 'tensorboar[d] --logdir'; true"
+    on "$p" "logdir=\$(ls -d $RUNS/*/${2:-measure} | head -n 1)
+      setsid nohup $BASE/venv/bin/tensorboard --logdir \$logdir --host 127.0.0.1 --port 6006 > /tmp/p14_tb.log 2>&1 < /dev/null & true"
     sleep 5
     echo "TensorBoard of ${2:-measure} on $p: open http://localhost:6006 (ctrl-c ends the forward)"
     kubectl port-forward -n "$NS" "$p" 6006:6006 ;;
