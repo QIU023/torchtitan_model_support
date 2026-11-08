@@ -236,9 +236,20 @@ case "${1:-status}" in
 { mkdir -p \$d; [ -f \$d/rc_node\$NODE_RANK ] || echo 99 > \$d/rc_node\$NODE_RANK; }"
     detached "cell_${stage}_$name" "$cmd"
     echo "$stage $row on both pods, in $d; ctrl-c stops watching, not the run (k8s.sh kill stops it)"
+    failed_since=
     until [ "$(on "$(any)" "[ -f $d/rc_node0 ] && [ -f $d/rc_node1 ] && echo done; true")" = done ]; do
       sleep 20
       on "$(any)" "grep -h 'step:' $d/node*.log 2>/dev/null | tail -n 1 | sed 's/\x1b\[[0-9;]*m//g'; true"
+      # A node that failed leaves the other one waiting in NCCL until its timeout: stop it after a minute.
+      bad=$(on "$(any)" "for k in 0 1; do [ -f $d/rc_node\$k ] && [ \"\$(cat $d/rc_node\$k)\" != 0 ] && echo \$k; done; true")
+      if [ -n "$bad" ]; then
+        [ -n "$failed_since" ] || failed_since=$SECONDS
+        if [ $((SECONDS - failed_since)) -ge 60 ]; then
+          echo "node $bad failed; stopping the other node's run, which waits for it"
+          for p in $(pods); do on "$p" "pkill -f 'torchtita[n].train'; true"; done
+          on "$(any)" "grep -h -m1 -E 'OutOfMemoryError|Error:' $d/node$bad.log | cut -c1-300; true"
+        fi
+      fi
     done
     on "$(any)" "echo \"rc: \$(cat $d/rc_node0) \$(cat $d/rc_node1)\"; grep -h 'multinode_5d\]' $d/node0.log | head -n 1
       $PY $KIT/summarize.py \$(dirname $d) | grep -E '^cell|^$name'; true" ;;
