@@ -195,7 +195,7 @@ case "${1:-status}" in
     row=${3:?row of matrix_k3.tsv or matrix_m3.tsv, such as k3_5d}
     shift 3
     for p in $(pods); do
-      if on "$p" "pgrep -f 'pipelin[e].py|torchtita[n].train' > /dev/null"; then
+      if [ "$(on "$p" "pgrep -f 'pipelin[e].py|torchtita[n].train' > /dev/null && echo busy; true")" = busy ]; then
         echo "$p: a pipeline or a training run is active; k8s.sh stop (or kill) first" >&2
         exit 1
       fi
@@ -210,7 +210,7 @@ case "${1:-status}" in
 { mkdir -p \$d; [ -f \$d/rc_node\$NODE_RANK ] || echo 99 > \$d/rc_node\$NODE_RANK; }"
     detached "cell_${stage}_$name" "$cmd"
     echo "$stage $row on both pods, in $d; ctrl-c stops watching, not the run (k8s.sh kill stops it)"
-    until on "$(any)" "[ -f $d/rc_node0 ] && [ -f $d/rc_node1 ]"; do
+    until [ "$(on "$(any)" "[ -f $d/rc_node0 ] && [ -f $d/rc_node1 ] && echo done; true")" = done ]; do
       sleep 20
       on "$(any)" "grep -h 'step:' $d/node*.log 2>/dev/null | tail -n 1 | sed 's/\x1b\[[0-9;]*m//g'; true"
     done
