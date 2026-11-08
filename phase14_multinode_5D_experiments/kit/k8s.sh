@@ -25,6 +25,8 @@
 #   k8s.sh both '<command>'    one command in both pods at once, detached (manual work; stop the pipeline first)
 # Environment: NS (default), JOB (p14), BASE (/mnt/shared/p14, MN_BASE in the manifest), PYTHON (python3).
 set -euo pipefail
+# Git Bash on Windows rewrites /mnt/... arguments of native programs such as kubectl.exe into Windows paths.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 NS=${NS:-default}
 JOB=${JOB:-p14}
 BASE=${BASE:-/mnt/shared/p14}

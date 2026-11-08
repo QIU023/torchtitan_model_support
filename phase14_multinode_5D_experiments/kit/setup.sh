@@ -8,7 +8,9 @@ mkdir -p $B $OUT
 exec > >(tee -a $B/setup_$(hostname).log) 2>&1
 [ "${MN_NODE_READY:-0}" = 1 ] || bash "$(dirname "$0")/setup_node.sh"
 set -eux
-CUDA_DRV=$(nvidia-smi | grep -o "CUDA Version: [0-9.]*" | grep -o "[0-9]*\.[0-9]*")
+# Driver 610 prints "CUDA UMD Version: 13.3" where older ones print "CUDA Version: 12.8".
+CUDA_DRV=$(nvidia-smi | grep -oE "CUDA (UMD )?Version: [0-9.]+" | grep -oE "[0-9]+\.[0-9]+" | head -n 1 || true)
+[ -n "$CUDA_DRV" ] || { echo "no CUDA version in nvidia-smi"; exit 1; }
 DRV_MAJOR=${CUDA_DRV%%.*}
 DRV_MINOR=${CUDA_DRV#*.}
 if [ "$DRV_MAJOR" -ge 13 ]; then CU=cu130

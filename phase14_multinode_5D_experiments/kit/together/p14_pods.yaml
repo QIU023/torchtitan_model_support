@@ -5,8 +5,8 @@
 # Each pod clones the kit onto the shared volume once, then runs kit/bootstrap.sh: packages, the shared setup, and
 # the unattended pipeline, which resumes where it stopped after a preemption (state on the shared volume). The
 # Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
-# Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). Together documents no RDMA settings for pods; the container
-# is privileged so NCCL can reach the HCAs, and the pipeline's first task (comm) reports whether it did.
+# Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). The GPU nodes offer the network operator's rdma/infiniband
+# resource; the pod takes one and is privileged so NCCL reaches the HCAs, and the first task (comm) reports whether it did.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -16,7 +16,7 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  volumeName: SHARED_VOLUME_NAME
+  volumeName: aaa
 ---
 apiVersion: v1
 kind: Service
@@ -71,7 +71,7 @@ spec:
           exec bash $L/phase14_multinode_5D_experiments/kit/bootstrap.sh
         env:
         - name: HW
-          value: h200
+          value: h100
         - name: MN_NET
           value: together
         - name: MN_BASE
@@ -80,14 +80,16 @@ spec:
           value: p14-0.p14
         # Pipeline scope: empty MN_ROWS runs every matrix row; MN_ROWS=k3_5d runs the 5D cell through all stages.
         - name: MN_MODELS
-          value: "k3 m3"
+          value: "k3"
+        # "none" matches no row: only setup, the communication check and the tokenizers run; start the matrix later
+        # with k8s.sh scope MN_ROWS=k3_5d and k8s.sh retask.
         - name: MN_ROWS
-          value: ""
+          value: "none"
         - name: MN_ORDER
           value: row
         # "0" leaves out the NCCL tuning runs of comm_sweep.tsv after the matrix (about 20 minutes).
         - name: MN_COMM_SWEEP
-          value: "1"
+          value: "0"
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: compute,utility
         - name: HF_TOKEN
@@ -99,8 +101,10 @@ spec:
         resources:
           limits:
             nvidia.com/gpu: 8
+            rdma/infiniband: 1
           requests:
             nvidia.com/gpu: 8
+            rdma/infiniband: 1
         securityContext:
           privileged: true
           capabilities:
