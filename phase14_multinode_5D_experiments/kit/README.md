@@ -6,13 +6,14 @@
 
 ## 1. titan 分支
 
-`phase14_multinode_5d` = `ac36e017b`（fork QIU023/torchtitan），实验分支，不开 PR。
+`phase14_multinode_5d` = `d6516df37`（fork QIU023/torchtitan），实验分支，不开 PR。
 - base：`minimax_m3_5d_review1` = `70b6efa63`。它是 upstream main `e111f10d4` 加上 M3 的 FSDP2 基线和 TP/EP/PP（#5635 + #5619 待同步的 head），所以 K3 用 main 上的代码，M3 用 5D 分支的代码。
-- 四个提交：
+- 五个提交：
   - `19a94ae72` kda：`KDAKernel.Config` 加 `gate_impl`（`"fused"` 默认，`"reference"` 给 A100）。对应 multinode.md §9.1 的本地改动，CP 的 KDA 也走同一个 `prepare_inputs`。
   - `4f7595d8f` 两个模型的缩小版 flavor（见第 2 节）。
   - `6f7ca8643` `torchtitan_recipes/multinode_5d.py`：一个 `cell()`，全部设置读 `MN_*` 环境变量（变量表在模块 docstring 里）；`seed()` 写单机 seed checkpoint（性能实验用不到，数值对照才要）。
   - `ac36e017b` 修默认 micro-batch 数：原来先取整、再取成 pp 的倍数，24K 在 dp 2 · pp 2 时会得到 12 个（589,824 token），现在一次取整得到 10 个（491,520 token）。
+  - `d6516df37` recipe 加两个开关：`MN_MEMSNAP`（每 n 步和 OOM 时存显存快照，默认只在每个节点的 local rank 0 上存）、`MN_TB`（TensorBoard）。kit 在 probe 开前者，在 measure 开后者。
 - 和 multinode.md 依据的 `432b95dcf` 不同的一处：当前 base 的 K3 CP 按 `MLAAttention` 映射到 `AllGatherKVMLAFlexAttention` / `UlyssesMLAAttention`，`InnerKDA` 映射到 `ContextParallelInnerKDA`（写法照 `tests/integration_tests/h100.py`），不是文档里的 `KVAllGatherCPFlexInnerAttention`。all-gather KV 默认配 `HeadTailCPLoadBalancer`，Ulysses 不配。
 - 统一设置：AdamW、fp32 主参数（`training.dtype=float32`，和文档 16 B/参的口径一致；K3 的测试 recipe 原本是 bf16）、默认 SelectiveAC、CUDA graph 关、一条序列一个 micro-batch、约 512K token / step（micro-batch 数取最接近的值并取成 pp 的倍数，比如 A100 的 24K 是 10 个 micro-batch、491,520 token）、K3 注意力用 flex。
 
@@ -86,12 +87,13 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 5. smoke：`export HW=h100 MASTER_ADDR=<node0> NODE_RANK=<0|1>`，然后 `bash kit/run_matrix.sh k3 smoke` 和 `bash kit/run_matrix.sh m3 smoke`。每行 debug 模型跑 5 步，确认每种布局都能起来。
 6. probe：`run_matrix.sh <k3|m3> probe` 用真模型在矩阵长度上跑 3 步，看 `summary_node0.tsv` 的 `peak_mem_gib` 和 `oom`。超了就在矩阵里缩短那一行，按 multinode.md §7.1 先拿 8K / 16K 校准。
 7. warm 再 measure：`run_matrix.sh <k3|m3> warm`，然后 `run_matrix.sh <k3|m3> measure`。measure 和 warm 共用一份编译 cache（每个节点各一份，在 `$OUT/cache/$HW/<model>/node<k>`）；measure 跑 30 步，第 25 步出 profiler trace，在 `<cell>/tt/` 下。
-8. `python kit/summarize.py $OUT/$HW/measure`：每格的峰值显存（哪个 rank）、第 3 步之后的 tps / tflops / mfu 中位数。结果写进本 phase 的 `results/<日期>_<hw>.md`。
+8. `python kit/summarize.py $OUT/$HW/measure`：每格的峰值显存（哪个 rank）、第 3 步之后的 tps / tflops / mfu 中位数。再跑 `python kit/trace_report.py $OUT/$HW/measure`，看每格的计算、按进程组拆的暴露通信和空闲（读法见 `K8S_RUN.md` 第 4 节）。结果写进本 phase 的 `results/<日期>_<hw>.md`。
 
 输出目录是 `$OUT/<hw>/<stage>/<行名>/`，里面有每个节点的 `node<k>.log`、`rc_node<k>`、`env_node<k>.txt`、`tree.txt`。所有 rank 都打印步日志（`LOG_RANK` 设成了全部 rank），这样 PP 每个 stage 的显存都看得到。
 
 ## 5. 还没验证、上机先看的
 
+- **trace 报告：** `trace_report.py` 只在合成 trace 上测过，进程组是靠 trace 里的 `record_param_comms` 对上的。第一次拿到真 trace，先看 `unattributed_pct` 是不是 0。
 - **K3 的 tokenizer：** titan 只认 `tokenizer.json` 或 vocab + merges，Kimi 的仓库很可能只有 tiktoken。`make_kimi_tokenizer.py` 是按 transformers 的 `TikTokenConverter` 写的，没跑过。
 - **K3 的纯文本数据：** recipe 用的是 M3 kit 跑过的 packed c4（`ConcatThenSplitPackingConfig` + `c4_document_capacity`）。K3 的测试一直用多模态 loader，纯文本 batch 走 dummy 视觉前向这条路在 K3 上没在 kit 里跑过。
 - **A100 的 reference 门控：** multinode.md §9.1 在 4070 Ti 上用本地改动跑过 debugmodel，本分支的 `gate_impl` 开关还没跑过。
@@ -110,6 +112,8 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `run_matrix.sh` | 一个模型、一个阶段，跑矩阵的每一行 |
 | `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型的组合和每种卡的长度 |
 | `summarize.py` | 解析日志，出每格一行的 TSV |
+| `trace_report.py`、`merge_traces.py` | 每格 trace 的时间拆分（计算、按进程组的暴露通信、拷贝、空闲，并入 tps、MFU、显存和 IB 速率）；一格所有 rank 合成一份 Perfetto trace |
+| `monitor.py` | 每个节点的 GPU 和 IB 采样器；`--show` 看最新一次，`--summary` 按任务汇总 |
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
 | `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
 | `run_comm.sh` | 两台一起：comm_bench 加 NCCL INFO 日志，判断走 IB 还是 socket、有没有 GPUDirect RDMA，列出大消息 busbw |
@@ -120,5 +124,5 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `bootstrap.sh` | pod 的入口：容器包、共享 setup（加锁）、流水线（崩了自动重启） |
 | `pipeline.py` | 无人值守流水线：comm、tokenizer、每行 smoke / probe / warm / measure；断点续跑、OOM 自动减半、两节点心跳协同 |
 | `setup_node.sh`、`assets.sh` | 每个容器的系统包和 IB 报告；两个模型的 tokenizer（K3 转换失败时退到 Qwen3） |
-| `nccl_tests.sh`、`comm_bench.py` | busbw：nccl-tests（主）和 torch.distributed（备） |
+| `nccl_tests.sh`、`comm_bench.py` | busbw 和 α–β 拟合：nccl-tests（要 MPI 和节点间 ssh）和 torch.distributed（k8s pod 上只能用它） |
 | `make_kimi_tokenizer.py` | 把 Kimi K3 的 tiktoken 转成 `tokenizer.json` |

@@ -12,6 +12,12 @@
 #   k8s.sh sync                copy this kit directory to the shared filesystem; scripts take effect at the next
 #                              attempt, matrix edits after retask
 #   k8s.sh collect [dir]       copy the results (no traces, no caches) to dir and summarize every stage
+#   k8s.sh top                 latest GPU (utilization, memory, power, SM clock) and InfiniBand rates of every node
+#   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
+#                              communication by process group / idle from the traces, InfiniBand rates
+#   k8s.sh trace <stage> <row> [dir]   one cell's ranks merged into one trace in dir, for ui.perfetto.dev
+#   k8s.sh tb [stage]          TensorBoard of a stage (measure) on pod 0, forwarded to localhost:6006
+#   k8s.sh fetch <path> [dir]  copy a file or directory under runs/ to dir (memory snapshots, raw traces)
 #   k8s.sh both '<command>'    one command in both pods at once, detached (manual work; stop the pipeline first)
 # Environment: NS (default), JOB (p14), BASE (/mnt/shared/p14, MN_BASE in the manifest), PYTHON (python3).
 set -euo pipefail
@@ -21,6 +27,7 @@ BASE=${BASE:-/mnt/shared/p14}
 PHASE=$BASE/logbook/phase14_multinode_5D_experiments
 KIT=$PHASE/kit
 RUNS=$BASE/runs
+PY=$BASE/venv/bin/python
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 
 pods() {
@@ -106,9 +113,34 @@ case "${1:-status}" in
       "${PYTHON:-python3}" "$HERE/kit/summarize.py" "$stage" > "$stage/summary.tsv" && echo "== $stage" && cat "$stage/summary.tsv"
     done
     echo "results in $dest" ;;
+  top)
+    on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS" ;;
+  report)
+    on "$(any)" "for s in $RUNS/*/${2:-measure}; do [ -d \$s ] && $PY $KIT/trace_report.py \$s; done
+      $PY $KIT/monitor.py --summary --out $RUNS > /dev/null; true" ;;
+  trace)
+    stage=${2:?stage} row=${3:?row} dest=${4:-.}
+    cell=$(on "$(any)" "ls -d $RUNS/*/$stage/$row 2>/dev/null | head -n 1")
+    [ -n "$cell" ] || { echo "no $stage/$row under $RUNS"; exit 1; }
+    on "$(any)" "$PY $KIT/merge_traces.py $cell"
+    mkdir -p "$dest"
+    kubectl exec -n "$NS" "$(any)" -- cat "$cell/merged_trace.json.gz" > "$dest/${row}_${stage}_trace.json.gz"
+    echo "$dest/${row}_${stage}_trace.json.gz: open it in https://ui.perfetto.dev" ;;
+  tb)
+    p=$(pod 0)
+    on "$p" "pkill -f 'tensorboar[d] --logdir'; logdir=\$(ls -d $RUNS/*/${2:-measure} | head -n 1)
+      setsid nohup $BASE/venv/bin/tensorboard --logdir \$logdir --host 127.0.0.1 --port 6006 > /tmp/p14_tb.log 2>&1 < /dev/null &"
+    sleep 5
+    echo "TensorBoard of ${2:-measure} on $p: open http://localhost:6006 (ctrl-c ends the forward)"
+    kubectl port-forward -n "$NS" "$p" 6006:6006 ;;
+  fetch)
+    dest=${3:-.}
+    mkdir -p "$dest"
+    kubectl exec -n "$NS" "$(any)" -- tar -C $RUNS -cf - "${2:?path under runs/}" | tar -C "$dest" -xf -
+    echo "copied $2 to $dest" ;;
   both)
     detached "both_$(date +%H%M%S)" "${2:?command}" ;;
   *)
-    sed -n '2,17p' "$0"
+    awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0"
     exit 1 ;;
 esac

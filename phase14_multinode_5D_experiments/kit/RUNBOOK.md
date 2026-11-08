@@ -57,6 +57,8 @@ export NODE_RANK=0                   # node 1 上写 1
 
 ## 4. 通信基线 E2（两台一起）
 
+先在两台上各开一个 GPU 和 IB 采样器，之后一直开着（写到 `~/p14/runs/$HW/monitor/`）：`nohup python3 $KIT/monitor.py > ~/p14/monitor.log 2>&1 &`。
+
 ```sh
 bash $KIT/run_comm.sh
 ```
@@ -106,11 +108,13 @@ bash $KIT/run_matrix.sh k3 warm      # 每行 10 步，填满编译 cache
 bash $KIT/run_matrix.sh k3 measure   # 每行 30 步，第 25 步出 profiler trace
 ```
 
+measure 跑完，看 trace 的时间拆分：`python $KIT/trace_report.py ~/p14/runs/$HW/measure`（读法见 `K8S_RUN.md` 第 4 节）。没有共享文件系统时，先在 node 0 上 `MN_COLLECT_TRACES=1 NODE1=... bash $KIT/collect.sh` 把 node 1 的 trace 也拉过来。
+
 M3 同样，把 `k3` 换成 `m3`。只重跑某几行，就把行名加在后面，例如 `bash $KIT/run_matrix.sh k3 probe k3_5d k3_A`。改了矩阵要在两台上同步。
 
 ## 8. 把结果带回 logbook
 
-- 要提交的：每个阶段的 `summary.tsv`、`progress_node*.txt`，以及每行的 `env_node*.txt`、`rc_node*`、`tree.txt`、两台的 `setup_*.log` 和 `venv_freeze_*.txt`、`comm_16.json`、nccl-tests 的输出。
+- 要提交的：每个阶段的 `summary.tsv`、`progress_node*.txt`，以及每行的 `env_node*.txt`、`rc_node*`、`tree.txt`、两台的 `setup_*.log` 和 `venv_freeze_*.txt`、`comm/` 下的 `verdict_node*.txt` 和 `comm_bench.json`、nccl-tests 的输出，measure 的 `trace_report*.tsv`，`monitor/monitor_summary.tsv`。
 - 不提交的：profiler trace 和完整日志（太大）。trace 留在机器上，或者另外打包。
 - 放在 `phase14_multinode_5D_experiments/results/<日期>_<hw>/` 下，再写一份说明，写明卡型、网络（IB 还是以太网）、titan 提交号。
 

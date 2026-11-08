@@ -3,9 +3,10 @@
 # MASTER_ADDR set), or under srun with one task per node.
 # Usage: run_matrix.sh <k3|m3> <smoke|probe|warm|measure> [row ...]
 #   smoke    debug flavor, test tokenizer, c4_test, short sequence, 5 steps: every layout starts and steps
-#   probe    downscale flavor, c4_test, 3 steps at the row's length: per-rank memory (rows that OOM get shorter)
+#   probe    downscale flavor, c4_test, 3 steps at the row's length: per-rank memory (rows that OOM get shorter),
+#            a memory snapshot at step 2 on each node's local rank 0
 #   warm     downscale flavor, c4, 10 steps of every row on the one compile cache the measured runs share
-#   measure  downscale flavor, c4, MEAS_STEPS (30) steps, profiler trace every PROFILE_FREQ (25) steps
+#   measure  downscale flavor, c4, MEAS_STEPS (30) steps, profiler trace every PROFILE_FREQ (25) steps, TensorBoard
 . "$(dirname "$0")/env.sh"
 set -u
 MODEL=$1
@@ -27,6 +28,8 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   # Both nodes walk the same rows, so each cell gets the same fresh rendezvous port on both.
   row=$((row + 1))
   envs=(MN_MODEL=$MODEL MN_CELL=$cell MN_GATE=$GATE MN_PORT=$((MASTER_PORT + row)))
+  # Stage defaults a row's extra variables can override: probe's memory snapshot, measure's TensorBoard.
+  case $STAGE in probe) envs+=(MN_MEMSNAP=${MN_MEMSNAP_PROBE-2}) ;; measure) envs+=(MN_TB=1) ;; esac
   skip=0
   for item in ${extra:-}; do
     case $item in

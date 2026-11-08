@@ -6,7 +6,10 @@ Groups: the whole world (16 ranks across the nodes) and each node's 8 ranks. Ops
 reduce_scatter and all_to_all over a group, and sendrecv between rank r and its peer on the other node (r +- 8)
 or on the same node (r xor 1). Bytes are the nccl-tests "size" (the full buffer); busbw uses nccl-tests' factors:
 all_reduce 2(n-1)/n, all_gather / reduce_scatter / alltoall (n-1)/n, sendrecv 1. Rank 0 prints the table.
-This is a fallback for nccl-tests (nccl_tests.sh); the numbers that go into a table come from nccl-tests.
+Sizes run from 256 B to 1 GiB, and rank 0 fits t = alpha + size / beta per op and group (least squares on the
+relative error) and prints alpha with the busbw beta implies; through torch.distributed, alpha includes each call's
+launch overhead. With --out, the JSON holds the measurements and the fits. Where MPI and ssh between the nodes exist,
+nccl-tests (nccl_tests.sh) is the reference; the k8s pods have neither, so there this is the measurement.
 """
 
 import argparse
@@ -30,9 +33,39 @@ def _time(fn, warmup: int, iters: int) -> float:
     return start.elapsed_time(end) / iters / 1e3
 
 
+def _fit(points: list[tuple[int, float]]):
+    """t = alpha + size / beta by least squares on the relative error; None unless the slope is positive."""
+    w = [1 / (t * t) for _, t in points]
+    sw = sum(w)
+    sx = sum(wi * s for wi, (s, _) in zip(w, points))
+    sxx = sum(wi * s * s for wi, (s, _) in zip(w, points))
+    sy = sum(wi * t for wi, (_, t) in zip(w, points))
+    sxy = sum(wi * s * t for wi, (s, t) in zip(w, points))
+    det = sw * sxx - sx * sx
+    if det <= 0:
+        return None
+    slope = (sw * sxy - sx * sy) / det
+    if slope <= 0:
+        return None
+    return (sxx * sy - sx * sxy) / det, 1 / slope
+
+
+def _fits(results: list[dict]) -> list[dict]:
+    fits = []
+    for key in sorted({(r["op"], r["group"], r["ranks"]) for r in results}):
+        rows = [r for r in results if (r["op"], r["group"], r["ranks"]) == key]
+        fit = _fit([(r["bytes"], r["time_s"]) for r in rows])
+        if fit is None:
+            continue
+        alpha, beta = fit
+        factor = rows[0]["busbw"] / rows[0]["algbw"]
+        fits.append(dict(op=key[0], group=key[1], ranks=key[2], alpha_us=alpha * 1e6, busbw=beta / 1e9 * factor))
+    return fits
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--min-bytes", type=int, default=1 << 20)
+    parser.add_argument("--min-bytes", type=int, default=256)
     parser.add_argument("--max-bytes", type=int, default=1 << 30)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--iters", type=int, default=20)
@@ -98,9 +131,13 @@ def main() -> None:
         print(f"{'op':15s} {'group':11s} {'ranks':>5s} {'bytes':>12s} {'algbw GB/s':>11s} {'busbw GB/s':>11s}")
         for r in results:
             print(f"{r['op']:15s} {r['group']:11s} {r['ranks']:5d} {r['bytes']:12d} {r['algbw']:11.1f} {r['busbw']:11.1f}")
+        fits = _fits(results)
+        print(f"fit {'op':15s} {'group':11s} {'ranks':>5s} {'alpha us':>9s} {'busbw GB/s':>11s}")
+        for fit in fits:
+            print(f"fit {fit['op']:15s} {fit['group']:11s} {fit['ranks']:5d} {fit['alpha_us']:9.1f} {fit['busbw']:11.1f}")
         if args.out:
             with open(args.out, "w") as f:
-                json.dump(results, f, indent=1)
+                json.dump(dict(results=results, fits=fits), f, indent=1)
     dist.destroy_process_group()
 
 

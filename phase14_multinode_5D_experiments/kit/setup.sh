@@ -18,9 +18,10 @@ export PATH=$HOME/.local/bin:$PATH
 command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh || python3 -m pip install --user uv
 [ -d $TT/.git ] || { rm -rf $TT; git clone --filter=blob:none --no-checkout https://github.com/QIU023/torchtitan.git $TT; }
 git -C $TT fetch origin $BRANCH
-[ -f $T/.git ] || { rm -rf $T; git -C $TT worktree prune; git -C $TT worktree add --detach $T origin/$BRANCH; }
+[ -f $T/.git ] || { rm -rf $T; git -C $TT worktree prune; git -C $TT worktree add --detach $T $BRANCH_SHA; }
+# A tree checked out by an earlier kit version moves to this kit's commit.
+[ "$(git -C $T rev-parse --short=9 HEAD)" = "$BRANCH_SHA" ] || git -C $T checkout --detach $BRANCH_SHA
 git -C $T log --oneline -1
-[ "$(git -C $T rev-parse --short=9 HEAD)" = "$BRANCH_SHA" ] || echo "WARNING: $T is not at $BRANCH_SHA"
 # A venv left half-built by an interrupted setup is rebuilt.
 $V/bin/python -c "import sys" 2>/dev/null || { rm -rf $V; uv venv --python 3.12 $V; }
 . $V/bin/activate

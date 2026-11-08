@@ -9,6 +9,8 @@ if command -v apt-get >/dev/null && [ "$(id -u)" = 0 ]; then
   apt-get install -y --no-install-recommends git curl ca-certificates build-essential rsync tmux iproute2 procps \
     rdma-core ibverbs-providers libibverbs1 ibverbs-utils infiniband-diags
 fi
+# The clone and the worktree on a shared filesystem may belong to another uid than this container's user.
+git config --global --add safe.directory '*' 2>/dev/null
 set +x
 ulimit -l unlimited 2>/dev/null
 nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader | sort | uniq -c

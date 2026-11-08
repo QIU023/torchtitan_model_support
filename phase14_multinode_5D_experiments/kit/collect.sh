@@ -5,7 +5,10 @@
 . "$(dirname "$0")/env.sh"
 set -eu
 : "${NODE1:?set NODE1 to the address of node 1}"
-rsync -a --exclude 'tt/profiling' -e "ssh -p ${NODE1_PORT:-22} -o StrictHostKeyChecking=no" \
+# Traces and memory snapshots stay behind; MN_COLLECT_TRACES=1 brings the traces too, for trace_report.py.
+skip=(--exclude 'tt/profiling')
+[ "${MN_COLLECT_TRACES:-0}" = 1 ] && skip=(--exclude 'tt/profiling/memory_snapshot')
+rsync -a "${skip[@]}" -e "ssh -p ${NODE1_PORT:-22} -o StrictHostKeyChecking=no" \
   root@$NODE1:$OUT/$HW/ $OUT/$HW/
 for stage in $OUT/$HW/*/; do
   [ -d "$stage" ] || continue

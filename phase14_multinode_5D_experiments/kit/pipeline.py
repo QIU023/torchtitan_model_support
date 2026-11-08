@@ -6,7 +6,9 @@ measure; MN_ORDER=stage runs every row's smoke first, and so on). Node 0 decides
 lengths and skips, and records each decision as a file under $OUT/$HW/pipeline/; node 1 follows those files. A
 finished task is never rerun, so a restarted pod resumes at the first unfinished one. Each node keeps a heartbeat
 with its state; a run whose peer died or moved on is killed and retried without counting as a failure. A probe that
-runs out of memory retries at half the length; warm and measure use the length the probe settled on.
+runs out of memory retries at half the length; warm and measure use the length the probe settled on. Probe stores a
+memory snapshot at step 2 (MN_MEMSNAP_PROBE, empty for none); measure writes TensorBoard metrics and a profiler trace;
+at the end node 0 writes the stage summaries, the monitor summary and the measure trace report.
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
 MN_ROWS (only these matrix rows), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
@@ -206,6 +208,7 @@ def cell_env(t: dict, seq: int) -> dict:
     e.update(MN_FLAVOR=ENV.get("MN_FLAVOR_OVERRIDE") or ENV[f"FLAVOR_{m}"], MN_SEQ=str(seq))
     if st == "probe":
         e.update(MN_STEPS="3", MN_DATASET="c4_test", MN_CACHE=f"{OUT}/cache/{HW}/probe_{m}")
+        e.setdefault("MN_MEMSNAP", ENV.get("MN_MEMSNAP_PROBE", "2"))
     elif st == "warm":
         e.update(MN_STEPS="10", MN_DATASET="c4", MN_CACHE=f"{OUT}/cache/{HW}/{m}")
     else:
@@ -215,6 +218,7 @@ def cell_env(t: dict, seq: int) -> dict:
             MN_DATASET="c4",
             MN_CACHE=f"{OUT}/cache/{HW}/{m}",
         )
+        e.setdefault("MN_TB", "1")
     return e
 
 
@@ -496,8 +500,14 @@ def finish(tasks: list[dict]) -> None:
         if stage_dir.is_dir() and any(stage_dir.glob("*/node0.log")):
             with open(stage_dir / "summary.tsv", "w") as f:
                 subprocess.call([sys.executable, str(K / "summarize.py"), str(stage_dir)], stdout=f)
+    with open(S / "report.log", "a") as f:
+        subprocess.call([sys.executable, str(K / "monitor.py"), "--summary"], stdout=f, stderr=subprocess.STDOUT)
+        if (OUT / HW / "measure").is_dir():
+            subprocess.call(
+                [sys.executable, str(K / "trace_report.py"), str(OUT / HW / "measure")], stdout=f, stderr=subprocess.STDOUT
+            )
     write(S / "ALL_DONE", time.strftime("%m-%d %H:%M:%S"))
-    log("pipeline finished; REPORT.txt and the summaries are written")
+    log("pipeline finished; REPORT.txt, the summaries and the measure trace report are written")
 
 
 def main() -> int:
