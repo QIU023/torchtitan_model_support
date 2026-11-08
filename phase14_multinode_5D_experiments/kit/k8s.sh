@@ -20,6 +20,8 @@
 #                              memory, power, NVLink and PCIe rates), with the newest step line (loss, memory, tps,
 #                              tflops, mfu) of the cell the node runs
 #   k8s.sh watch [seconds]     top again every 5 (or the given) seconds until ctrl-c
+#   k8s.sh tail [0|1] [steps]  follow the newest cell's training log of node 0 (ranks 0-7) or node 1 (ranks 8-15);
+#                              with steps, only the step lines (loss, memory, tps, tflops, mfu)
 #   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
 #                              communication by process group / idle from the traces, InfiniBand rates
 #   k8s.sh trace <stage> <row> [dir]   one cell's ranks merged into one trace in dir, for ui.perfetto.dev
@@ -156,6 +158,16 @@ case "${1:-status}" in
   comm)
     on "$(any)" "for h in $RUNS/*/; do [ -d \${h}comm ] || continue; echo \"== \$h\"
       cat \${h}comm/verdict_node*.txt; $PY $KIT/comm_compare.py \$h; done; true" ;;
+  tail)
+    n=${2:-0}
+    f=$(on "$(any)" "ls -t $RUNS/*/*/*/node$n.log $RUNS/*/manual/*/*/node$n.log 2>/dev/null | head -n 1")
+    [ -n "$f" ] || { echo "no node$n.log yet" >&2; exit 1; }
+    echo "== $f (ctrl-c to stop)"
+    if [ "${3:-}" = steps ]; then
+      kubectl exec -n "$NS" "$(any)" -- bash -c "tail -n +1 -f $f | grep --line-buffered 'step:'"
+    else
+      kubectl exec -n "$NS" "$(any)" -- tail -n 50 -f "$f"
+    fi ;;
   top)
     on "$(any)" "$PY $KIT/monitor.py --show --out $RUNS --dcgm '$(dcgm_map)'" ;;
   watch)
