@@ -149,7 +149,7 @@ async function tick(){
   plot("mfu",xs,[{ys:ps.map(p=>p.mfu_min),color:"#bbb",width:1},{ys:ps.map(p=>p.mfu_max),color:"#bbb",width:1},{ys:ps.map(p=>p.mfu),color:"#d04a4a"}],"MFU %");
   plot("tps",xs,[{ys:ps.map(p=>p.tps),color:"#4a7bd0"}],"tps per rank (mean)");
   let h="<table><tr><th>rank</th><th>step</th><th>loss</th><th>mem GiB</th><th>tps</th><th>TFLOPS</th><th>MFU %</th></tr>";
-  for(const [r,v] of Object.entries(d.ranks||{}))h+="<tr><td>"+r+"</td><td>"+v.step+"</td><td>"+f(v.loss,4)+"</td><td>"+f(v.mem,1)+"</td><td>"+f(v.tps,0)+"</td><td>"+f(v.tflops,1)+"</td><td>"+f(v.mfu,2)+"</td></tr>";
+  for(const [r,v] of Object.entries(d.ranks||{}))h+="<tr><td>"+r+"</td><td>"+v.step+"</td><td>"+(v.loss<0?'<span class=muted>no loss stage</span>':f(v.loss,4))+"</td><td>"+f(v.mem,1)+"</td><td>"+f(v.tps,0)+"</td><td>"+f(v.tflops,1)+"</td><td>"+f(v.mfu,2)+"</td></tr>";
   document.getElementById("ranks").innerHTML=h+"</table>";
   h="<table><tr><th>node</th><th>gpu</th><th>util %</th><th>SM active</th><th>tensor active</th><th>DRAM active</th><th>mem GiB</th><th>power W</th><th>NVLink tx/rx GB/s</th><th>PCIe tx/rx GB/s</th></tr>";
   for(const [n,gs] of Object.entries(d.gpus||{}))for(const [g,m] of Object.entries(gs))
