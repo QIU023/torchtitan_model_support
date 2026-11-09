@@ -7,8 +7,9 @@ process group through the record_param_comms op that launched it; unattributed_p
 that found none. An NCCL kernel's time includes waiting for its peers, so exposed communication also holds load
 imbalance and pipeline bubbles, and eff_busbw (message bytes over kernel time, nccl-tests factors) is a lower bound.
 Writes trace_report.tsv (one row per cell, joined with summarize.py's tps / mfu / peak memory and monitor.py's
-InfiniBand rates), trace_report_pg.tsv (per cell, process group and collective) and trace_report_rank.tsv (per cell
-and rank) into the stage directory, and prints the first.
+InfiniBand rates), trace_report_pg.tsv (per cell, process group and collective), trace_report_rank.tsv (per cell
+and rank) and trace_report_groups.tsv (each process group's hashed name, as Perfetto shows it on an NCCL kernel, with
+its label and member ranks) into the stage directory, and prints the first.
 """
 
 import argparse
@@ -50,6 +51,7 @@ RANK_COLUMNS = [
     "cell", "rank", "node", "window_ms", "compute_ms", "exposed_ms", "copy_ms", "idle_ms", "comm_ms",
     "unattributed_ms",
 ]
+GROUP_COLUMNS = ["cell", "group", "label", "size", "ranks"]
 
 
 def label_of(desc: str) -> str:
@@ -345,7 +347,11 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
         )
         for r in ranks
     ]
-    return row, pg_rows, rank_rows
+    group_rows = [
+        dict(cell=cell.name, group=name, label=pg_label[name], size=len(m), ranks=",".join(map(str, sorted(m))))
+        for name, m in sorted(members.items(), key=lambda kv: (pg_label[kv[0]], sorted(kv[1])))
+    ]
+    return row, pg_rows, rank_rows, group_rows
 
 
 def monitor_stats(stage_dir: Path) -> dict:
@@ -396,7 +402,7 @@ def main() -> int:
         print(f"no traces under {args.stage_dir}/*/tt/profiling/traces")
         return 1
     stats = monitor_stats(args.stage_dir)
-    cell_out, pg_out, rank_out = [], [], []
+    cell_out, pg_out, rank_out, group_out = [], [], [], []
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         for cell in cells:
             files = trace_files(cell)
@@ -407,14 +413,18 @@ def main() -> int:
                 print(f"{cell.name}: unreadable (truncated?) traces of ranks {bad}", file=sys.stderr)
             if not ranks:
                 continue
-            row, pg_rows, rank_rows = cell_rows(cell, ranks, args.nproc, extras(args.stage_dir, cell, args.nproc, stats))
+            row, pg_rows, rank_rows, group_rows = cell_rows(
+                cell, ranks, args.nproc, extras(args.stage_dir, cell, args.nproc, stats)
+            )
             cell_out.append(row)
             pg_out += pg_rows
             rank_out += rank_rows
+            group_out += group_rows
             print(f"{cell.name}: {len(files)} ranks", file=sys.stderr)
     write_tsv(args.stage_dir / "trace_report.tsv", CELL_COLUMNS, cell_out)
     write_tsv(args.stage_dir / "trace_report_pg.tsv", PG_COLUMNS, pg_out)
     write_tsv(args.stage_dir / "trace_report_rank.tsv", RANK_COLUMNS, rank_out)
+    write_tsv(args.stage_dir / "trace_report_groups.tsv", GROUP_COLUMNS, group_out)
     print((args.stage_dir / "trace_report.tsv").read_text(), end="")
     return 0
 

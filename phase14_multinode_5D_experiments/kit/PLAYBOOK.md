@@ -41,7 +41,7 @@ PK=/mnt/shared/p14/logbook/phase14_multinode_5D_experiments/kit    # pod 里 kit
 | `MEAS_STEPS`、`PROFILE_FREQ` | `5`、`5` | 跑 5 步，第 5 步出 trace（profiler 的 warmup 3 步加 active 1 步正好放得下） |
 | `MN_ROWS` | 空 | 矩阵的每一行；只跑几行就写行名，用空格隔开 |
 
-NCCL 超时保持默认：初始化和第 1 步 300 秒，之后 120 秒（`node0.log` 的 `[multinode_5d]` 行打印 `nccl_timeout=300/120s`）。11-08 的四格都在默认值下跑完。
+NCCL 超时清单不设，用 titan 的默认：初始化和第 1 步 300 秒，之后 100 秒。11-08 的四格设过 `MN_NCCL_TIMEOUT=15`，但 measure 要写 trace，recipe 会把它抬到至少 120 秒，所以实际是 120 秒（`node0.log` 的 `[multinode_5d]` 行打印 `nccl_timeout=300/120s`）。
 
 全部命令：
 
@@ -153,7 +153,14 @@ bash $K8S status
 ### 4.4 跑完以后（`ALL_DONE`）
 
 1. `bash $K8S report`：measure 每格一行的时间拆分。
-2. `bash $K8S fetch h100 $R/raw`：整份拉回本机（日志、trace、TensorBoard、NCCL 日志、监控）。另外把 `/mnt/shared/p14/` 下的 `setup_*.log`、`scope.env` 和流水线日志放进 `$R/raw/top/`（用 `bash $K8S shell 0` 打包，或者 `kubectl exec ... cat`）。
+2. `bash $K8S fetch h100 $R/raw`：整份拉回本机（日志、trace、TensorBoard、NCCL 日志、监控）。再把共享卷顶层的 setup、流水线、采样器日志和 `scope.env` 拉进 `$R/raw/top/`：
+
+   ```sh
+   mkdir -p $R/raw/top
+   P=$(kubectl get pods -l job-name=p14 -o name | head -n 1)
+   kubectl exec $P -- bash -c 'cd /mnt/shared/p14 && tar -cf - *.log scope.env 2>/dev/null' | tar -C $R/raw/top -xf -
+   ```
+
 3. 本机检查每个 trace 能不能读、出报告、合成 trace（第 6.2 节），写 `$R/README.md`。
 4. 确认 `raw/` 完整（文件数和大小与共享卷一致）后，在控制台删集群（第 8 节）。
 
@@ -300,6 +307,7 @@ tensorboard --logdir $M/<格>/tt/tb
   各列的定义见 `K8S_RUN.md` 第 4 节。
 - `trace_report_pg.tsv`：暴露通信按进程组拆，标签有 TP、CP、EP、FSDP、EFSDP（专家 FSDP）、DPR（HSDP 副本）、PP、LOSS，另外给出每组的 `eff_busbw`。
 - `trace_report_rank.tsv`：每个 rank 一行，用来找慢 rank。
+- `trace_report_groups.tsv`：每个进程组的哈希名、标签和成员 rank。Perfetto 里点一个 NCCL kernel，参数里的 `Process Group Name` 就在这里查。
 - 两点注意：
   - NCCL kernel 的时间包含等对方的时间，所以 PP 那一行含气泡等待，EP 那一行含路由不均，`eff_busbw` 是下限；
   - trace 里的进程组只有哈希名、组大小和组内 rank，`trace_report.py` 按格子的 mesh 推出每个组的成员，标成 TP、CP、FSDP、EP 这些名字；几个维度成员相同时合成一个标签（如 `FSDP/LOSS`、`CPxTP/EP`）。11-08 的四格 `unattributed_pct` 都是 0。
