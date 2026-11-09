@@ -22,7 +22,7 @@ git -C $T rev-parse HEAD > $D/tree.txt
 # Every rank logs its step line, so the memory of each pipeline stage is visible; lines carry the global rank.
 LOG_RANK=$(seq -s, 0 $((NNODES * NPROC - 1))) PYTHONPATH=$T \
 TORCHINDUCTOR_CACHE_DIR=$CACHE/ic TRITON_CACHE_DIR=$CACHE/tc \
-PYTORCH_ALLOC_CONF=${PYTORCH_ALLOC_CONF:-expandable_segments:True} \
+PYTORCH_ALLOC_CONF=${PYTORCH_ALLOC_CONF:-expandable_segments:True} PYTHONUNBUFFERED=1 \
 timeout ${MN_TIMEOUT:-5400} torchrun --nnodes=$NNODES --nproc_per_node=$NPROC --node_rank=$NODE_RANK \
   --master_addr=$MASTER_ADDR --master_port=$PORT --tee 3 --log_line_prefix_template '[rank${rank}]:' \
   -m torchtitan.train --module torchtitan_recipes.multinode_5d --config cell --output-dir $D/tt \

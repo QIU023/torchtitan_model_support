@@ -51,6 +51,15 @@ def steps(cell: Path) -> dict[int, list[dict]]:
     return ranks
 
 
+def log_tail(log: Path, size: int = 1 << 17) -> list[str]:
+    with open(log, "rb") as f:
+        f.seek(0, 2)
+        end = f.tell()
+        f.seek(max(0, end - size))
+        lines = f.read().decode(errors="replace").splitlines()
+    return [ANSI.sub("", line) for line in (lines[1:] if end > size else lines)][-400:]
+
+
 def data(out: Path, dcgm_ips: dict[str, str]) -> dict:
     cell = newest_cell(out)
     result: dict = dict(time=time.time(), cell=str(cell) if cell else None, states={}, ranks={}, per_step=[], gpus={})
@@ -76,6 +85,7 @@ def data(out: Path, dcgm_ips: dict[str, str]) -> dict:
                 mfu_max=max(mfus, default=None), tps=sum(tps) / len(tps) if tps else None,
                 mem_max=max(r["mem"] for r in by_step[step]),
             ))
+        result["logs"] = {log.stem: log_tail(log) for log in sorted(cell.glob("node*.log"))}
         env = cell / "env_node0.txt"
         result["env"] = [l for l in env.read_text().splitlines() if l.startswith(("MN_CELL", "MN_FLAVOR", "MN_SEQ",
                          "MN_STEPS", "MN_COMPILE", "MN_MICROBATCHES", "NCCL_IB_HCA"))] if env.exists() else []
@@ -93,7 +103,7 @@ def data(out: Path, dcgm_ips: dict[str, str]) -> dict:
     return result
 
 
-PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>Phase 14 live</title>
+PAGE = r"""<!doctype html><html><head><meta charset="utf-8"><title>Phase 14 live</title>
 <style>
 body{font:13px system-ui,sans-serif;margin:16px;background:#fafafa;color:#222}
 h2{font-size:15px;margin:18px 0 6px}table{border-collapse:collapse;background:#fff}
@@ -101,8 +111,14 @@ td,th{border:1px solid #ddd;padding:2px 6px;text-align:right;font-variant-numeri
 th{background:#f0f0f0}.bar{display:inline-block;height:8px;background:#4a7bd0;vertical-align:middle}
 pre{background:#fff;border:1px solid #ddd;padding:6px;max-height:220px;overflow:auto}
 canvas{background:#fff;border:1px solid #ddd}.muted{color:#777}
+.logs{display:flex;gap:8px}.logs>div{flex:1;min-width:0}
+.logs pre{height:420px;max-height:none;font:11px ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;margin:0}
+.err{color:#c00;font-weight:600}.step{color:#06c}
 </style></head><body>
 <div id="head"></div>
+<h2>Training logs of the newest cell, both nodes (newest at the bottom)
+ <select id="lf"><option value="nowarn">hide warnings</option><option value="all">all lines</option><option value="steps">steps and errors</option></select></h2>
+<div class="logs"><div><b>node 0 (ranks 0-7)</b><pre id="log0"></pre></div><div><b>node 1 (ranks 8-15)</b><pre id="log1"></pre></div></div>
 <h2>MFU and tps per step (mean over ranks; band = min..max MFU)</h2>
 <canvas id="mfu" width="900" height="220"></canvas><br><canvas id="tps" width="900" height="160"></canvas>
 <h2>Latest step of every rank</h2><div id="ranks"></div>
@@ -144,7 +160,24 @@ async function tick(){
   document.getElementById("prof").innerHTML=(t?t+" trace files (measure, step 25): k8s.sh trace &lt;stage&gt; &lt;row&gt; merges them for ui.perfetto.dev<br>":"no profiler trace in this cell (measure writes one at step 25)<br>")+
     (s?s+" memory snapshots: k8s.sh fetch the cell's tt/profiling/memory_snapshot for pytorch.org/memory_viz":"no memory snapshot (probe writes one at step 2)");
   document.getElementById("comm").textContent=d.comm||"";
+  showLogs(d.logs||{});
 }
+const ERR=/Traceback|Error|error:|OutOfMemory|out of memory|Timeout|timed out|Watchdog|NCCL WARN|exitcode|SIGTERM|Killed/;
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function showLogs(logs){
+  const mode=document.getElementById("lf").value;
+  for(const n of [0,1]){
+    let lines=logs["node"+n]||[];
+    if(mode==="nowarn"){const keep=[];let skipNext=false;
+      for(const l of lines){if(skipNext){skipNext=false;continue}
+        if(/Warning:/.test(l)&&!ERR.test(l)){skipNext=true;continue}keep.push(l)}lines=keep}
+    if(mode==="steps")lines=lines.filter(l=>/step:/.test(l)||ERR.test(l)||/\[multinode_5d\]/.test(l));
+    const el=document.getElementById("log"+n),atEnd=el.scrollTop+el.clientHeight>=el.scrollHeight-20;
+    el.innerHTML=lines.slice(-250).map(l=>ERR.test(l)?'<span class="err">'+esc(l)+'</span>':/step:/.test(l)?'<span class="step">'+esc(l)+'</span>':esc(l)).join("\n")||"(no log yet)";
+    if(atEnd)el.scrollTop=el.scrollHeight;
+  }
+}
+document.getElementById("lf").onchange=()=>tick();
 tick();setInterval(tick,3000);
 </script></body></html>"""
 
