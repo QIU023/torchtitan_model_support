@@ -1,0 +1,48 @@
+node 0 rc=0 ulimit_l=unlimited log=/mnt/shared/p14/runs/h100/comm/comm_node0.log
+NCCL variables: NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9 NCCL_SOCKET_IFNAME=eth0 NCCL_VERSION=2.25.1-1 
+NCCL transport: NET/IB : Using [0]mlx5_6:1/IB [1]mlx5_7:1/IB [2]mlx5_8:1/IB [3]mlx5_9:1/IB [4]mlx5_0:1/IB [5]mlx5_1:1/IB [6]mlx5_2:1/IB [7]mlx5_3:1/IB [RO]
+InfiniBand: yes
+GPUDirect RDMA: yes
+busbw of messages >= 256 MiB (GB/s):
+all_reduce      world          16    268435456       204.1       382.7
+all_gather      world          16    268435456       320.5       300.4
+reduce_scatter  world          16    268435456       316.0       296.2
+alltoall        world          16    268435456        93.8        88.0
+all_reduce      node            8    268435456       246.1       430.7
+all_gather      node            8    268435456       369.7       323.5
+reduce_scatter  node            8    268435456       372.6       326.0
+alltoall        node            8    268435456       349.4       305.7
+sendrecv        cross_node      2    268435456        43.3        43.3
+sendrecv        same_node       2    268435456        68.2        68.2
+all_reduce      world          16    536870912       222.9       418.0
+all_gather      world          16    536870912       344.5       323.0
+reduce_scatter  world          16    536870912       352.5       330.4
+alltoall        world          16    536870912        95.4        89.4
+all_reduce      node            8    536870912       255.2       446.5
+all_gather      node            8    536870912       385.2       337.0
+reduce_scatter  node            8    536870912       382.4       334.6
+alltoall        node            8    536870912       359.9       314.9
+sendrecv        cross_node      2    536870912        42.8        42.8
+sendrecv        same_node       2    536870912        68.2        68.2
+all_reduce      world          16   1073741824       234.3       439.3
+all_gather      world          16   1073741824       347.3       325.6
+reduce_scatter  world          16   1073741824       360.6       338.0
+alltoall        world          16   1073741824        96.7        90.7
+all_reduce      node            8   1073741824       266.4       466.2
+all_gather      node            8   1073741824       394.5       345.2
+reduce_scatter  node            8   1073741824       392.6       343.5
+alltoall        node            8   1073741824       376.8       329.7
+sendrecv        cross_node      2   1073741824        43.4        43.4
+sendrecv        same_node       2   1073741824        68.3        68.3
+alpha-beta fit, t = alpha + size / beta (through torch.distributed, alpha includes each call's launch overhead):
+fit op              group       ranks  alpha us  busbw GB/s
+fit all_gather      node            8      40.2       366.2
+fit all_gather      world          16      50.6       290.7
+fit all_reduce      node            8      46.3       436.5
+fit all_reduce      world          16      54.6       361.9
+fit alltoall        node            8      39.7       325.4
+fit alltoall        world          16      70.9        86.1
+fit reduce_scatter  node            8      40.8       371.4
+fit reduce_scatter  world          16      52.6       296.0
+fit sendrecv        cross_node      2      50.6        44.7
+fit sendrecv        same_node       2      44.7        78.7

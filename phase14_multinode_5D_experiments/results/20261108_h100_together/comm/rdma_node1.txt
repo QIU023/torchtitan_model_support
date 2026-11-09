@@ -1,0 +1,8 @@
+mlx5_0 367.58 Gb/s
+mlx5_1 367.77 Gb/s
+mlx5_2 367.64 Gb/s
+mlx5_3 367.78 Gb/s
+mlx5_6 364.10 Gb/s
+mlx5_7 364.76 Gb/s
+mlx5_8 364.39 Gb/s
+mlx5_9 364.68 Gb/s

@@ -1,0 +1,14 @@
+node 1 rc=0 ulimit_l=unlimited log=/mnt/shared/p14/runs/h100/comm/comm_node1.log
+NCCL variables: NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9 NCCL_SOCKET_IFNAME=eth0 NCCL_VERSION=2.25.1-1 
+raw RDMA write bandwidth per IB port (ib_write_bw, host memory, node 1 to node 0):
+mlx5_0 367.58 Gb/s
+mlx5_1 367.77 Gb/s
+mlx5_2 367.64 Gb/s
+mlx5_3 367.78 Gb/s
+mlx5_6 364.10 Gb/s
+mlx5_7 364.76 Gb/s
+mlx5_8 364.39 Gb/s
+mlx5_9 364.68 Gb/s
+NCCL transport: NET/IB : Using [0]mlx5_6:1/IB [1]mlx5_7:1/IB [2]mlx5_8:1/IB [3]mlx5_9:1/IB [4]mlx5_0:1/IB [5]mlx5_1:1/IB [6]mlx5_2:1/IB [7]mlx5_3:1/IB [RO]
+InfiniBand: yes
+GPUDirect RDMA: yes
