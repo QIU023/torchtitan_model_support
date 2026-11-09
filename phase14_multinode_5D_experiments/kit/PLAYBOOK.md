@@ -147,6 +147,7 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_CP=ulysses`：MLA 的 CP 用 Ulysses；
 - `MN_FSDP_KEEP=1`：FSDP 整步不 reshard；
 - `MN_MICROBATCHES=<n>`：每个 dp rank 的 micro-batch 数，默认取最接近每步 512K token 的值；
+- `MN_SEQ_FORCE=<n>`（写进 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；
 - `MN_COMPILE=0`：K3 的局部编译区改成 eager，flex attention 不做 autotune（flex 不能完全不编译，长序列 eager 会 OOM）；省编译时间，但 kernel 没调优，MFU 偏低；
 - 任何 `NCCL_*` 变量（第 7.4 节）；
 - `h200:VAR=值`：只在这种卡上生效；

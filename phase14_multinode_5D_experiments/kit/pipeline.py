@@ -222,6 +222,8 @@ def cell_env(t: dict, seq: int) -> dict:
         )
         return e
     e.update(assets_env(m))
+    # MN_SEQ_FORCE sets one length for every row's probe, warm and measure, in place of the matrix and the probe.
+    seq = int(ENV.get("MN_SEQ_FORCE") or seq)
     e.update(MN_FLAVOR=ENV.get("MN_FLAVOR_OVERRIDE") or ENV[f"FLAVOR_{m}"], MN_SEQ=str(seq))
     if st == "probe":
         e.update(MN_STEPS="3", MN_DATASET="c4_test", MN_CACHE=f"{OUT}/cache/{HW}/probe_{m}")
