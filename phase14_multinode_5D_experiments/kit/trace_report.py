@@ -199,13 +199,59 @@ def analyze_rank(path_str: str) -> dict:
             if comm_active[key] == 0:
                 del comm_active[key]
     window = bounds[-1][0] - bounds[0][0] if bounds else 0.0
+    pg_names = sorted({str(op[2].get("Process Group Name")) for ops in comms.values() for op in ops
+                       if op[2].get("Process Group Name")})
     return dict(
         rank=rank,
         window=window,
         acc=acc,
         unattributed=unattributed,
         groups=[(key, g[0], g[1], g[2], exposed_by.get(key, 0.0)) for key, g in groups.items()],
+        pg_names=pg_names,
     )
+
+
+def cell_degrees(cell: Path) -> dict[str, int]:
+    deg = dict.fromkeys(("pp", "dpr", "dp", "cp", "tp", "ep"), 1)
+    env = cell / "env_node0.txt"
+    for line in env.read_text().splitlines() if env.exists() else []:
+        if line.startswith("MN_CELL="):
+            for item in filter(None, line.split("=", 1)[1].split(",")):
+                k, v = item.split("=")
+                deg[k] = int(v)
+    return deg
+
+
+def mesh_groups(deg: dict[str, int]) -> dict[frozenset, set]:
+    """Rank sets of titan's process groups for a cell: mesh (pp, dp_replicate, dp_shard, cp, tp), EP innermost."""
+    pp, dpr, dp, cp, tp, ep = (deg[k] for k in ("pp", "dpr", "dp", "cp", "tp", "ep"))
+    coords = [(p, r, d, c, t) for p in range(pp) for r in range(dpr) for d in range(dp) for c in range(cp) for t in range(tp)]
+
+    def rank(p, r, d, c, t):
+        return (((p * dpr + r) * dp + d) * cp + c) * tp + t
+
+    def flat(co):
+        return (co[2] * cp + co[3]) * tp + co[4]
+
+    groups: dict[frozenset, set] = {}
+    for label, key in (
+        ("TP", lambda co: (co[0], co[1], co[2], co[3])),
+        ("CP", lambda co: (co[0], co[1], co[2], co[4])),
+        ("FSDP", lambda co: (co[0], co[1], co[4])),
+        ("DPR", lambda co: (co[0], co[2], co[3], co[4])),
+        ("LOSS", lambda co: (co[0], co[4])),
+        ("PP", lambda co: (co[1], co[2], co[3], co[4])),
+        ("EP", lambda co: (co[0], co[1], flat(co) // ep)),
+        ("EFSDP", lambda co: (co[0], co[1], flat(co) % ep)),
+        ("WORLD", lambda co: 0),
+    ) + ((("CPxTP", lambda co: (co[0], co[1], co[2])),) if cp > 1 and tp > 1 else ()):
+        buckets: dict = defaultdict(set)
+        for co in coords:
+            buckets[key(co)].add(rank(*co))
+        for members in buckets.values():
+            if len(members) > 1:
+                groups.setdefault(frozenset(members), set()).add(label)
+    return groups
 
 
 def trace_files(cell: Path) -> list[Path]:
@@ -240,9 +286,22 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
     mean_window = mean(r["window"] for r in ranks) or 1.0
     comm_total = sum(r["acc"]["comm"] for r in ranks)
     nccl_total = sum(g[2] for r in ranks for g in r["groups"])
+    # A group's members are the ranks whose traces name it; the cell's mesh says which dimension that set is.
+    members: dict[str, set] = defaultdict(set)
+    for r in ranks:
+        for name in r.get("pg_names", []):
+            members[name].add(r["rank"])
+    deg = cell_degrees(cell)
+    known = mesh_groups(deg)
+    pg_label = {name: "/".join(sorted(known.get(frozenset(m), {"?"}))) for name, m in members.items()}
     merged: dict[tuple, list] = defaultdict(lambda: [0, 0.0, 0, 0.0])
     for r in ranks:
         for key, kernels, kernel_us, nbytes, exposed_us in r["groups"]:
+            label = pg_label.get(key[1], key[0])
+            if key[2] in ("send", "recv") and deg["pp"] > 1:
+                # Pipeline send / recv name the global group; in titan only PP uses point-to-point.
+                label = "PP"
+            key = (label, key[1] if label in ("?", key[0]) else label, key[2], key[3])
             m = merged[key]
             m[0] += kernels
             m[1] += kernel_us
