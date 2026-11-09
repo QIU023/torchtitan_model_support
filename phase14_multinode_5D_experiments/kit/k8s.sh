@@ -214,8 +214,9 @@ case "${1:-status}" in
     [ -n "$cell" ] || { echo "no $stage/$row under $RUNS"; exit 1; }
     on "$(any)" "$PY $KIT/merge_traces.py $cell"
     mkdir -p "$dest"
-    kubectl exec -n "$NS" "$(any)" -- cat "$cell/merged_trace.json.gz" > "$dest/${row}_${stage}_trace.json.gz"
-    echo "$dest/${row}_${stage}_trace.json.gz: open it in https://ui.perfetto.dev" ;;
+    out="$dest/${row}_${stage//\//_}_trace.json.gz"
+    kubectl exec -n "$NS" "$(any)" -- cat "$cell/merged_trace.json.gz" > "$out"
+    echo "$out: open it in https://ui.perfetto.dev" ;;
   tb)
     p=$(pod 0)
     on "$p" "pkill -f 'tensorboar[d] --logdir'; true"
