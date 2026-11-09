@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from monitor import dcgm, default_out  # noqa: E402
-from summarize import ANSI, PREFIX, STEP  # noqa: E402
+from summarize import ANSI, cell_rows  # noqa: E402
 
 DCGM_FIELDS = [
     ("util", "DCGM_FI_DEV_GPU_UTIL", 1.0), ("sm", "DCGM_FI_PROF_SM_ACTIVE", 1.0),
@@ -36,18 +36,9 @@ def newest_cell(out: Path):
 
 def steps(cell: Path) -> dict[int, list[dict]]:
     ranks: dict[int, list[dict]] = {}
-    for log in sorted(cell.glob("node*.log")):
-        for raw in log.read_text(errors="replace").splitlines():
-            line = ANSI.sub("", raw)
-            m = STEP.search(line)
-            p = PREFIX.match(line)
-            if not m or not p:
-                continue
-            step, loss, _, mem, _, tps, tflops, mfu = m.groups()
-            ranks.setdefault(int(p.group(1)), []).append(dict(
-                step=int(step), loss=float(loss), mem=float(mem), tps=float(tps.replace(",", "")),
-                tflops=float(tflops.replace(",", "")), mfu=None if mfu == "N/A" else float(mfu.rstrip("%")),
-            ))
+    for row in cell_rows(cell)[0]:
+        if row["rank"] >= 0:
+            ranks.setdefault(row["rank"], []).append(row)
     return ranks
 
 
@@ -79,11 +70,13 @@ def data(out: Path, dcgm_ips: dict[str, str]) -> dict:
         for step in sorted(by_step):
             mfus = [r["mfu"] for r in by_step[step] if r["mfu"] is not None]
             tps = [r["tps"] for r in by_step[step]]
+            secs = [r["step_s"] for r in by_step[step] if r["step_s"] is not None]
             result["per_step"].append(dict(
                 step=step, ranks=len(by_step[step]),
                 mfu=sum(mfus) / len(mfus) if mfus else None, mfu_min=min(mfus, default=None),
                 mfu_max=max(mfus, default=None), tps=sum(tps) / len(tps) if tps else None,
                 mem_max=max(r["mem"] for r in by_step[step]),
+                step_s=sum(secs) / len(secs) if secs else None, step_s_max=max(secs, default=None),
             ))
         result["logs"] = {log.stem: log_tail(log) for log in sorted(cell.glob("node*.log"))}
         env = cell / "env_node0.txt"
@@ -121,6 +114,7 @@ canvas{background:#fff;border:1px solid #ddd}.muted{color:#777}
 <div class="logs"><div><b>node 0 (ranks 0-7)</b><pre id="log0"></pre></div><div><b>node 1 (ranks 8-15)</b><pre id="log1"></pre></div></div>
 <h2>MFU and tps per step (mean over ranks; band = min..max MFU)</h2>
 <canvas id="mfu" width="900" height="220"></canvas><br><canvas id="tps" width="900" height="160"></canvas>
+<br><canvas id="secs" width="900" height="160"></canvas>
 <h2>Latest step of every rank</h2><div id="ranks"></div>
 <h2>GPUs (DCGM, live)</h2><div id="gpus"></div>
 <h2>Profiler output of this cell</h2><div id="prof"></div>
@@ -148,8 +142,9 @@ async function tick(){
   const ps=d.per_step||[],xs=ps.map(p=>p.step);
   plot("mfu",xs,[{ys:ps.map(p=>p.mfu_min),color:"#bbb",width:1},{ys:ps.map(p=>p.mfu_max),color:"#bbb",width:1},{ys:ps.map(p=>p.mfu),color:"#d04a4a"}],"MFU %");
   plot("tps",xs,[{ys:ps.map(p=>p.tps),color:"#4a7bd0"}],"tps per rank (mean)");
-  let h="<table><tr><th>rank</th><th>step</th><th>loss</th><th>mem GiB</th><th>tps</th><th>TFLOPS</th><th>MFU %</th></tr>";
-  for(const [r,v] of Object.entries(d.ranks||{}))h+="<tr><td>"+r+"</td><td>"+v.step+"</td><td>"+(v.loss<0?'<span class=muted>no loss stage</span>':f(v.loss,4))+"</td><td>"+f(v.mem,1)+"</td><td>"+f(v.tps,0)+"</td><td>"+f(v.tflops,1)+"</td><td>"+f(v.mfu,2)+"</td></tr>";
+  plot("secs",xs,[{ys:ps.map(p=>p.step_s_max),color:"#bbb",width:1},{ys:ps.map(p=>p.step_s),color:"#2a9d55"}],"step time s (mean over ranks; grey = slowest rank; step 1 includes startup and compilation)");
+  let h="<table><tr><th>rank</th><th>step</th><th>step s</th><th>loss</th><th>mem GiB</th><th>tps</th><th>TFLOPS</th><th>MFU %</th></tr>";
+  for(const [r,v] of Object.entries(d.ranks||{}))h+="<tr><td>"+r+"</td><td>"+v.step+"</td><td>"+f(v.step_s,2)+"</td><td>"+(v.loss<0?'<span class=muted>no loss stage</span>':f(v.loss,4))+"</td><td>"+f(v.mem,1)+"</td><td>"+f(v.tps,0)+"</td><td>"+f(v.tflops,1)+"</td><td>"+f(v.mfu,2)+"</td></tr>";
   document.getElementById("ranks").innerHTML=h+"</table>";
   h="<table><tr><th>node</th><th>gpu</th><th>util %</th><th>SM active</th><th>tensor active</th><th>DRAM active</th><th>mem GiB</th><th>power W</th><th>NVLink tx/rx GB/s</th><th>PCIe tx/rx GB/s</th></tr>";
   for(const [n,gs] of Object.entries(d.gpus||{}))for(const [g,m] of Object.entries(gs))

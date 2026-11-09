@@ -2,14 +2,17 @@
 
 Reads every <cell>/node<k>.log (launch.sh has torchrun prefix lines with [rank<global rank>]:), takes the TorchTitan
 step lines of all ranks and prints one TSV row per cell: exit codes, OOM, steps, loss at the first and last step,
-the peak reserved memory over ranks (and which rank), and the median tps / tflops / mfu over steps after --skip
-(default 3, the compile and warm-up steps).
+the peak reserved memory over ranks (and which rank), and the median tps / tflops / mfu / step time over steps after
+--skip (default 3, the compile and warm-up steps), plus the first step's time (startup and compilation included). A
+step's time is the gap between the rank's timestamps of that step line and the one before it ("Training starts" for
+step 1).
 """
 
 import argparse
 import re
 import statistics
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -19,21 +22,30 @@ STEP = re.compile(
     r"memory:\s*([\d.]+)GiB\(([\d.]+)%\)\s+tps:\s*([\d,]+)\s+tflops:\s*([\d,.]+)\s+mfu:\s*([\d.]+%|N/A)"
 )
 OOM = re.compile(r"OutOfMemoryError|CUDA out of memory")
+TS = re.compile(r"\[titan\] (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),(\d{3})")
+STARTS = "Training starts at step"
 
 
-def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
-    rows = []
-    oom = False
+def cell_rows(cell: Path) -> tuple[list[dict], bool]:
+    """Every step line of a cell's logs with its step time (step_s), and whether any rank ran out of memory."""
+    rows, oom, last = [], False, {}
     for log in sorted(cell.glob("node*.log")):
         for raw in log.read_text(errors="replace").splitlines():
             line = ANSI.sub("", raw)
             oom = oom or bool(OOM.search(line))
+            prefix = PREFIX.match(line)
+            rank = int(prefix.group(1)) if prefix else -1
+            ts = TS.search(line)
+            t = datetime.strptime(ts.group(1), "%Y-%m-%d %H:%M:%S").timestamp() + int(ts.group(2)) / 1e3 if ts else None
+            if t is not None and STARTS in line:
+                last[rank] = t
             match = STEP.search(line)
             if not match:
                 continue
-            prefix = PREFIX.match(line)
-            rank = int(prefix.group(1)) if prefix else -1
             step, loss, _, mem, mem_pct, tps, tflops, mfu = match.groups()
+            step_s = t - last[rank] if t is not None and rank in last else None
+            if t is not None:
+                last[rank] = t
             rows.append(
                 dict(
                     rank=rank,
@@ -44,8 +56,14 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
                     tps=float(tps.replace(",", "")),
                     tflops=float(tflops.replace(",", "")),
                     mfu=None if mfu == "N/A" else float(mfu.rstrip("%")),
+                    step_s=step_s,
                 )
             )
+    return rows, oom
+
+
+def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
+    rows, oom = cell_rows(cell)
     rcs = ",".join(p.read_text().strip() for p in sorted(cell.glob("rc_node*"))) or "-"
     out = dict(cell=cell.name, rc=rcs, oom="OOM" if oom else "", steps=0)
     if not rows:
@@ -69,6 +87,10 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
         tps=median("tps"),
         tflops=median("tflops"),
         mfu=median("mfu"),
+        step_s=median("step_s"),
+        first_step_s=statistics.median(
+            [r["step_s"] for r in rows if r["step"] == steps[0] and r["step_s"] is not None] or [float("nan")]
+        ),
     )
     return out
 
@@ -81,7 +103,7 @@ def main() -> None:
     args = parser.parse_args()
     columns = [
         "cell", "rc", "oom", "steps", "loss_first", "loss_last",
-        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu",
+        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s",
     ]
     print("\t".join(columns))
     for cell in sorted(p for p in args.stage_dir.iterdir() if p.is_dir()):
