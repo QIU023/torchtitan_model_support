@@ -94,7 +94,10 @@ def load_trace(path: Path) -> dict:
 def analyze_rank(path_str: str) -> dict:
     path = Path(path_str)
     rank = int(re.search(r"rank(\d+)_trace", path.name).group(1))
-    events = load_trace(path).get("traceEvents", [])
+    try:
+        events = load_trace(path).get("traceEvents", [])
+    except (OSError, EOFError, ValueError):
+        return dict(rank=rank, unreadable=True)
     comms: dict[tuple, list] = defaultdict(list)
     launches: dict = {}
     gpu = []
@@ -339,6 +342,12 @@ def main() -> int:
         for cell in cells:
             files = trace_files(cell)
             ranks = list(pool.map(analyze_rank, [str(f) for f in files]))
+            bad = [r["rank"] for r in ranks if r.get("unreadable")]
+            ranks = [r for r in ranks if not r.get("unreadable")]
+            if bad:
+                print(f"{cell.name}: unreadable (truncated?) traces of ranks {bad}", file=sys.stderr)
+            if not ranks:
+                continue
             row, pg_rows, rank_rows = cell_rows(cell, ranks, args.nproc, extras(args.stage_dir, cell, args.nproc, stats))
             cell_out.append(row)
             pg_out += pg_rows

@@ -62,11 +62,16 @@ def main() -> int:
         print(f"no traces under {args.cell}/tt/profiling/traces")
         return 1
 
-    # Pass 1: the earliest kept event and the first ProfilerStep of every rank.
-    first, steps = {}, {}
+    # Pass 1: the earliest kept event and the first ProfilerStep of every rank; unreadable files are left out.
+    first, steps, good = {}, {}, []
     for f in files:
         rank = int(f.name.split("_")[0][len("rank"):])
-        trace = load_trace(f)
+        try:
+            trace = load_trace(f)
+        except (OSError, EOFError, ValueError):
+            print(f"{f.name}: unreadable (truncated?), left out", file=sys.stderr)
+            continue
+        good.append(f)
         base = base_us(trace)
         events = trace.get("traceEvents", [])
         times = [float(e["ts"]) + base for e in events if keep(e, args.cpu) and "ts" in e]
@@ -77,6 +82,10 @@ def main() -> int:
         if t is not None:
             node = rank // args.nproc
             node_step[node] = min(t, node_step.get(node, t))
+    if not good:
+        print(f"no readable traces under {args.cell}/tt/profiling/traces")
+        return 1
+    files = good
     shift = {rank: 0.0 for rank in first}
     if node_step:
         earliest = min(node_step.values())
