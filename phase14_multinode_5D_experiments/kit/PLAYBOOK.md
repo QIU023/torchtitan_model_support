@@ -147,6 +147,8 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_CP=ulysses`：MLA 的 CP 用 Ulysses；
 - `MN_FSDP_KEEP=1`：FSDP 整步不 reshard；
 - `MN_MICROBATCHES=<n>`：每个 dp rank 的 micro-batch 数，默认取最接近每步 512K token 的值；
+- `MN_VPP=<v>`：PP 的格子用 `Interleaved1F1B`，每个 rank v 个虚拟 stage；层数切不出这么多时降到能整除的最大值（K3 缩小版 29 层在 pp 2 下能到 4，debug 小模型只能到 2），实际值打印在 `node0.log` 的 `[multinode_5d]` 那一行；
+- `MN_NCCL_TIMEOUT=<秒>`：第 1 步以后的 NCCL 超时；有 rank 在存显存快照或 trace 的阶段（probe、measure）不低于 120 秒，否则会把正常的运行判成超时；`MN_NCCL_INIT_TIMEOUT` 管初始化和第 1 步（默认 300）；
 - `MN_SEQ_FORCE=<n>`（写进 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；
 - `MN_COMPILE=0`：K3 的局部编译区改成 eager，flex attention 不做 autotune（flex 不能完全不编译，长序列 eager 会 OOM）；省编译时间，但 kernel 没调优，MFU 偏低；
 - 任何 `NCCL_*` 变量（第 7.4 节）；
