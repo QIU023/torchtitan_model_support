@@ -158,7 +158,7 @@ def build_tasks() -> list[dict]:
     models = ENV.get("MN_MODELS", "k3 m3").split()
     stages = ENV.get("MN_STAGES", "smoke probe warm measure").split()
     only = set(ENV.get("MN_ROWS", "").split())
-    tasks = [dict(id="comm", kind="comm")]
+    tasks = [dict(id="comm", kind="comm")] if ENV.get("MN_COMM", "1") == "1" else []
     if set(stages) & {"probe", "warm", "measure"}:
         tasks += [dict(id=f"assets.{m}", kind="assets", model=m) for m in models]
     for m in models:
@@ -175,7 +175,7 @@ def build_tasks() -> list[dict]:
 
 def comm_variants() -> list[dict]:
     """The NCCL tuning variants of comm_sweep.tsv as comm tasks after the matrix; MN_COMM_SWEEP=0 leaves them out."""
-    if ENV.get("MN_COMM_SWEEP", "1") != "1":
+    if ENV.get("MN_COMM_SWEEP", ENV.get("MN_COMM", "1")) != "1":
         return []
     out = []
     for line in (K / "comm_sweep.tsv").read_text().splitlines():
@@ -222,8 +222,6 @@ def cell_env(t: dict, seq: int) -> dict:
         )
         return e
     e.update(assets_env(m))
-    # MN_SEQ_FORCE sets one length for every row's probe, warm and measure, in place of the matrix and the probe.
-    seq = int(ENV.get("MN_SEQ_FORCE") or seq)
     e.update(MN_FLAVOR=ENV.get("MN_FLAVOR_OVERRIDE") or ENV[f"FLAVOR_{m}"], MN_SEQ=str(seq))
     if st == "probe":
         e.update(MN_STEPS="3", MN_DATASET="c4_test", MN_CACHE=f"{OUT}/cache/{HW}/probe_{m}")
@@ -373,12 +371,11 @@ def stopped() -> bool:
 
 
 def current_seq(t: dict) -> int:
+    """The length a cell runs at: a halved retry, else the probe's length, else MN_SEQ_FORCE, else the matrix's."""
     if t["kind"] != "cell" or t["stage"] == "smoke":
         return 0
-    key = f"{t['model']}.{t['name']}"
-    if t["stage"] == "probe":
-        return int(read(mark("try", t["id"])) or t["seq"])
-    return int(read(mark("len", key)))
+    settled = read(mark("len", f"{t['model']}.{t['name']}")) if t["stage"] != "probe" else None
+    return int(read(mark("try", t["id"])) or settled or ENV.get("MN_SEQ_FORCE") or t["seq"])
 
 
 def blocked(t: dict, ids: set) -> str | None:
@@ -392,7 +389,7 @@ def blocked(t: dict, ids: set) -> str | None:
     for n in need:
         if n in ids and not mark("done", n).exists():
             return f"skipped: {n} did not finish"
-    if st in ("warm", "measure") and not mark("len", f"{m}.{name}").exists():
+    if st in ("warm", "measure") and f"{m}.probe.{name}" in ids and not mark("len", f"{m}.{name}").exists():
         return "skipped: no probe length"
     return None
 
@@ -459,7 +456,11 @@ def lead(t: dict, idx: int, ids: set) -> None:
             write(mark("done", tid), "ok")
             log(f"{tid}: done")
             return
-        if t["kind"] == "cell" and t["stage"] == "probe" and oom_in(run_dir(t)) and seq // 2 >= MIN_SEQ:
+        # Without a probe in the plan, the first stage of the row that runs the real model halves on OOM instead.
+        halves = t["kind"] == "cell" and (
+            t["stage"] == "probe" or (t["stage"] != "smoke" and f"{t['model']}.probe.{t['name']}" not in ids)
+        )
+        if halves and oom_in(run_dir(t)) and seq // 2 >= MIN_SEQ:
             write(mark("try", tid), str(seq // 2))
             archive(t, a, f"oom{seq}")
             log(f"{tid}: out of memory at seq {seq}, retrying at {seq // 2} (not counted)")
@@ -569,7 +570,7 @@ def print_cell_env(model: str, stage: str, row: str) -> int:
         print(f"echo 'no row {row} in matrix_{model}.tsv, or stage {stage} unknown' >&2; false")
         return 1
     t = dict(id=f"{model}.{stage}.{row}", kind="cell", model=model, stage=stage, **rows[0])
-    seq = 0 if stage == "smoke" else int(read(mark("len", f"{model}.{row}")) or rows[0]["seq"])
+    seq = current_seq(t)
     for k, v in cell_env(t, seq).items():
         print(f"export {k}={shlex.quote(v)}")
     return 0

@@ -25,6 +25,7 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   [[ "$ONLY" != "  " && "$ONLY" != *" $name "* ]] && continue
   case $HW in h100) seq=$s_h100 ;; h200|b200) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
+  seq=${MN_SEQ_FORCE:-$seq}
   # Both nodes walk the same rows, so each cell gets the same fresh rendezvous port on both.
   row=$((row + 1))
   envs=(MN_MODEL=$MODEL MN_CELL=$cell MN_GATE=$GATE MN_PORT=$((MASTER_PORT + row)))

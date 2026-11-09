@@ -37,15 +37,20 @@ esac
 
 # MN_NET=nebius: a Nebius GPU cluster (pods or VMs); the settings of Nebius's own NCCL test (docs.nebius.com,
 # kubernetes/gpu/nccl-test): bootstrap on eth0, data on the mlx5 InfiniBand HCAs.
-# MN_NET=together: a Together GPU cluster; its docs give no NCCL settings, so bootstrap on the pod's eth0 and let NCCL
-# find the HCAs (run_comm.sh lists the ones it used; set MN_IB_HCA if a RoCE front-end port shows up among them).
+# MN_NET=together: a Together GPU cluster; its docs give no NCCL settings, so bootstrap on the pod's eth0 and hand NCCL
+# only the InfiniBand ports: the 2026-11-08 H100 nodes also had two 200G RoCE front-end ports (mlx5_4, mlx5_5).
 case "${MN_NET:-}" in
   nebius)
     MN_IFNAME=${MN_IFNAME:-eth0}
     MN_IB_HCA=${MN_IB_HCA:-mlx5}
     export UCX_NET_DEVICES=${UCX_NET_DEVICES:-eth0} SHARP_COLL_ENABLE_PCI_RELAXED_ORDERING=1 NCCL_COLLNET_ENABLE=0 ;;
   together)
-    MN_IFNAME=${MN_IFNAME:-eth0} ;;
+    MN_IFNAME=${MN_IFNAME:-eth0}
+    if [ -z "${MN_IB_HCA:-}" ]; then
+      MN_IB_HCA=$(for p in /sys/class/infiniband/*/ports/1; do
+        [ "$(cat $p/link_layer 2>/dev/null)" = InfiniBand ] && basename $(dirname $(dirname $p)); done | paste -sd, -)
+      [ -z "$MN_IB_HCA" ] || MN_IB_HCA="=$MN_IB_HCA"
+    fi ;;
 esac
 
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}

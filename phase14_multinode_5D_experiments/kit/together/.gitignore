@@ -1,0 +1,2 @@
+# Cluster credentials (tg clusters get-credentials writes them here when run from this folder) never go into git.
+kubeconfig*

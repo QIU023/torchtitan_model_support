@@ -7,11 +7,17 @@
 - [preemptible compute](https://docs.together.ai/docs/preemptible-compute)
 - [health checks](https://docs.together.ai/docs/health-checks)
 
-**还没在 Together 上跑过。** 完整流程见 `../PLAYBOOK.md`，这里只放建集群的细节和依据。
+**2026-11-08 在 Together 的 2 × 8 H100（抢占式）上跑过**，结果在 `../../results/20261108_h100_together/`。完整流程见 `../PLAYBOOK.md`（默认的快速路径在第 0 节），这里只放建集群的细节和依据。
+
+11-08 实测：
+- pod 用清单里的 `rdma/infiniband: 1` 加 privileged 就能拿到 IB，不需要 `hostNetwork`；
+- 每个节点 8 个 400G IB 口（`mlx5_0`-`3`、`mlx5_6`-`9`），另有两个 200G RoCE 前端口（`mlx5_4`、`mlx5_5`），`env.sh` 自动只用 IB 的口；
+- NCCL 走 IB，有 GPUDirect RDMA；每个口 RDMA 原始带宽 364 到 368 Gb/s，16 卡 1 GiB all_reduce busbw 439 GB/s；
+- 驱动 610 / CUDA 13.3；node 1 的 GPU 5 有热降频（`../PLAYBOOK.md` 第 4.3 节）。
 
 ## 0. 和 Nebius 不一样的地方
 
-- **IB 进 pod 的方式文档没写：** 文档只说每种卡的节点之间都是 3.2 Tb/s InfiniBand（每个节点 8 条 rail），但没写 pod 怎么拿到 RDMA 设备，也没给 NCCL 设置。清单照 Nebius 的做法开 privileged，流水线第一个任务 `comm` 会告诉你 NCCL 到底走没走 IB。
+- **IB 进 pod 的方式文档没写：** 文档只说每种卡的节点之间都是 3.2 Tb/s InfiniBand（每个节点 8 条 rail），但没写 pod 怎么拿到 RDMA 设备，也没给 NCCL 设置。清单申请 `rdma/infiniband: 1` 并开 privileged，11-08 实测这样 NCCL 就走 IB 和 GDR；每一格的 `net` 列会再确认一次。
 - **共享存储：** Together 会建一个和共享卷同名的静态 PV（ReadWriteMany，默认 StorageClass），PVC 用 `volumeName` 绑上去即可。
 - **抢占式节点：**
   1. 被抢占时先 cordon 节点，发 `TogetherPreemptionNotified` 事件，并给 pod 发 SIGTERM；
@@ -43,7 +49,7 @@ kubectl get pv                                                      # 找到共�
 ## 3. 拉起两个 pod
 
 ```sh
-# 先改 together/p14_pods.yaml：volumeName 填上一步的 PV 名，HW、MN_ROWS（第一次建议 k3_5d）
+# 先改 together/p14_pods.yaml：volumeName 填上一步的 PV 名，HW；其余是快速路径的默认值
 kubectl create secret generic hf-token --from-literal=token=<hf_token>   # 可选，下载 tokenizer 用
 kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
 bash phase14_multinode_5D_experiments/kit/k8s.sh status

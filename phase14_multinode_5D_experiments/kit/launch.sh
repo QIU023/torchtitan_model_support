@@ -19,8 +19,15 @@ cd $T
 { env | grep -E '^(MN_|HW=|NCCL_|UCX_|SHARP_|GLOO_|NODE_RANK=|MASTER_ADDR=)' | sort; echo "ulimit_l=$(ulimit -l)"; } \
   > $D/env_node$NODE_RANK.txt
 git -C $T rev-parse HEAD > $D/tree.txt
+# NCCL's transport choice (IB or sockets, GPUDirect RDMA) goes to per-process files beside the logs, so every run
+# checks the network without a separate test (summarize.py reads them); MN_NCCL_INFO=0 turns it off.
+NCCL_LOG=()
+if [ "${MN_NCCL_INFO:-1}" = 1 ]; then
+  mkdir -p $D/nccl
+  NCCL_LOG=(NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET NCCL_DEBUG_FILE=$D/nccl/%h.%p.log)
+fi
 # Every rank logs its step line, so the memory of each pipeline stage is visible; lines carry the global rank.
-LOG_RANK=$(seq -s, 0 $((NNODES * NPROC - 1))) PYTHONPATH=$T \
+env "${NCCL_LOG[@]}" LOG_RANK=$(seq -s, 0 $((NNODES * NPROC - 1))) PYTHONPATH=$T \
 TORCHINDUCTOR_CACHE_DIR=$CACHE/ic TRITON_CACHE_DIR=$CACHE/tc \
 PYTORCH_ALLOC_CONF=${PYTORCH_ALLOC_CONF:-expandable_segments:True} PYTHONUNBUFFERED=1 \
 timeout ${MN_TIMEOUT:-5400} torchrun --nnodes=$NNODES --nproc_per_node=$NPROC --node_rank=$NODE_RANK \

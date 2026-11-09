@@ -1,6 +1,6 @@
-# Phase 14 完整流程：Together 上 2 × 8 卡的 5D 实验（2026-11-08）
+# Phase 14 完整流程：Together 上 2 × 8 卡的 5D 实验（2026-11-08 实跑后定稿）
 
-从开集群到出结果的全部步骤、每一种并行配置怎么跑、对应的 profiler，以及 NCCL / RDMA 的验证和调优，都在这一份里。**这套流程只在本机模拟过（两节点协同、合成 trace、假 kubectl），还没在真集群上跑过。**
+2026-11-08 在 Together 的 2 × 8 H100 上实跑过一次，结果和 trace 的读法在 `../results/20261108_h100_together/README.md`。**以后租多节点，默认走第 0 节的快速路径：setup 完成后直接 measure 矩阵的每一行，不做单独的环境测试。** 四个阶段的完整研究（smoke / probe / warm / measure、通信基线、NCCL 调优扫描）在第 4.2 节，需要时再打开。
 
 其他文件只放细节：
 - `together/README.md`：建集群、kubeconfig、IB 排查；
@@ -9,50 +9,78 @@
 - `README.md`：titan 分支、两个缩小版模型、矩阵的来由；
 - `../multinode.md`：纸面规划和每格的预期。
 
-下文的命令都在本机 logbook 根目录下执行，先设：
+下文的命令都在本机 logbook 根目录下执行（Windows 上用 Git Bash），先设：
 
 ```sh
 K8S=phase14_multinode_5D_experiments/kit/k8s.sh
 PK=/mnt/shared/p14/logbook/phase14_multinode_5D_experiments/kit    # pod 里 kit 的位置
 ```
 
-## 0. 总览
+## 0. 快速路径（默认）
 
-| 步骤 | 在哪 | 做什么 | 纸面时间 |
+| 步骤 | 在哪 | 做什么 | 11-08 实际用时 |
 |---|---|---|---|
-| 1 | 本机 | 充值、装工具、改清单 | 10 分钟 |
-| 2 | Together 控制台 | 建集群（2 个节点、Kubernetes、共享卷） | 等资源 |
-| 3 | 本机 | 拿 kubeconfig、填卷名、`kubectl apply` | 5 分钟 |
-| 4 | pod 里自动 | setup → 通信检查（RDMA + NCCL）→ tokenizer → 每行 smoke / probe / warm / measure → NCCL 调优扫描 → 报告 | 第一轮约 2 到 3 小时 |
-| 5 | 本机 | 看进度、看 report / trace / 通信结论 | 随时 |
-| 6 | 本机 + 控制台 | collect、删集群、处理共享卷 | 10 分钟 |
+| 1 | 本机 | 充值，装 `tg` 和 `kubectl`，清单里填 `volumeName` 和 `HW` | 10 分钟 |
+| 2 | Together 控制台 | 建集群：2 个节点、Kubernetes、共享卷 | 等资源 |
+| 3 | 本机 | `get-credentials`，`kubectl apply` | 5 分钟 |
+| 4 | pod 里自动 | 容器包、共享 setup、tokenizer | 约 15 分钟 |
+| 5 | pod 里自动 | K3 矩阵 9 行，每行 measure 一次：5 步，第 5 步出所有 rank 的 trace；OOM 的行长度减半重跑 | 每行 3 到 7 分钟，9 行约 50 分钟 |
+| 6 | 本机 | 跑的时候看 dashboard；`ALL_DONE` 后 `report`、整份拉回本机、删集群 | 15 分钟 |
 
-费用：16 张抢占式按 $1.995 算，每小时 $31.92，从节点上线算到删集群，setup 和空转也算。第一轮只跑 `k3_5d` 一行加调优扫描，约 $65 到 $100；两个模型全矩阵约 8 到 10 小时，$260 到 $320。都是纸面估计。
+从 `apply` 到 `ALL_DONE` 约 1 小时 15 分钟。16 张 H100 抢占式每小时约 $32，一轮约 $50，另加等资源和收尾的时间。
+
+清单 `together/p14_pods.yaml` 已经写好的设置，也就是 11-08 跑通的配置：
+
+| 变量 | 值 | 作用 |
+|---|---|---|
+| `MN_STAGES` | `measure` | 只跑 measure。smoke 只证明布局能起来，probe 只量显存，warm 只填编译 cache；不编译、长度固定时这三步都用不上 |
+| `MN_COMM` | `0` | 不跑单独的通信检查。每次运行都把 NCCL 的 INFO 日志写进 `<格>/nccl/`，`summary.tsv` 的 `net` 列写着这一格走的是 `IB+GDR`、`IB` 还是 `Socket`；`0` 同时关掉 NCCL 调优扫描 |
+| `MN_SEQ_FORCE` | `16384` | 所有行用 16K；OOM 的行自动减半，最低 4096 |
+| `MN_COMPILE` | `0` | eager：K3 的局部编译区不编译，flex attention 不 autotune。每种布局省掉编译时间；MFU 偏低，但各行同口径，可以互相比 |
+| `MN_VPP` | `2` | PP 的行用 `Interleaved1F1B`，每个 rank 2 个虚拟 stage（K3 80G 缩小版每个虚拟 stage 8 层） |
+| `MEAS_STEPS`、`PROFILE_FREQ` | `5`、`5` | 跑 5 步，第 5 步出 trace（profiler 的 warmup 3 步加 active 1 步正好放得下） |
+| `MN_ROWS` | 空 | 矩阵的每一行；只跑几行就写行名，用空格隔开 |
+
+NCCL 超时保持默认：初始化和第 1 步 300 秒，之后 120 秒（`node0.log` 的 `[multinode_5d]` 行打印 `nccl_timeout=300/120s`）。11-08 的四格都在默认值下跑完。
+
+全部命令：
+
+```sh
+# 本机：清单里填 volumeName（kubectl get pv 里和共享卷同名的那个）和 HW（h100 / h200 / b200）
+tg clusters list
+tg clusters get-credentials <CLUSTER_ID> --set-default-context --no-json
+kubectl get pv
+kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
+
+# 跑的时候
+bash $K8S status          # setup、两个节点的心跳、流水线最近的决定；跑完后打印 REPORT.txt
+bash $K8S dash            # 浏览器开 http://localhost:8765（第 4.3 节）
+bash $K8S watch 5         # 终端版：16 张卡的 DCGM 和正在跑的那一格的最新一步
+
+# ALL_DONE 之后
+R=phase14_multinode_5D_experiments/results/<日期>_h100_together
+bash $K8S report                    # measure 每格一行的时间拆分（trace_report*.tsv）
+bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace（11-08 是 7.4 GB），raw/ 不进 git
+```
+
+拉回本机以后的分析（第 6.2 节）不需要集群，确认 `raw/` 完整以后就可以删集群。
 
 ## 1. 开始前（本机）
 
-1. **余额：** 创建时余额要够"抢占式目标的 4 小时 + 按需部分的最短时长 + 同期存储"，16 卡约 $128 起。第一轮建议充到 $200 左右，跑全量准备 $400 左右。余额用完，集群立刻暂停，宽限期后删除，而且扣完之前没有提醒。
-2. **工具：** `kubectl`，以及 Together CLI：`uv tool install "together[cli]" --upgrade`。
-3. **改清单** `phase14_multinode_5D_experiments/kit/together/p14_pods.yaml`：
-
-```yaml
-  volumeName: <共享卷对应的 PV 名，第 3 步查>
-...
-        - name: HW
-          value: h200        # 控制台标价 $1.995 和文档里 H100 抢占式的价一致；是 H100 就写 h100
-        - name: MN_MODELS
-          value: "k3"        # 第一轮只跑 K3
-        - name: MN_ROWS
-          value: "k3_5d"     # 第一轮只跑 5D 全开这一行；留空就是整个矩阵
-        - name: MN_COMM_SWEEP
-          value: "1"         # 矩阵跑完后做 NCCL 调优扫描，约 20 分钟；"0" 不做
-```
+1. **余额：** 创建时余额要够"抢占式目标的 4 小时 + 按需部分的最短时长 + 同期存储"，16 卡约 $128 起，快速路径一轮充 $200 够用。余额用完，集群立刻暂停，宽限期后删除，而且扣完之前没有提醒。
+2. **工具：**
+   - Together CLI：`uv tool install "together[cli]" --upgrade`；
+   - `kubectl`：Windows 上 `winget install Kubernetes.kubectl`。`k8s.sh` 会自己找 winget 装的位置，所以新开的终端里没有 `kubectl` 也能用；
+   - Windows 上所有 `bash $K8S ...` 都在 Git Bash 里跑，`k8s.sh` 已经关掉了 Git Bash 对 `/mnt/...` 参数的路径改写。
+3. **改清单** `phase14_multinode_5D_experiments/kit/together/p14_pods.yaml`，只有两处：
+   - `volumeName`：共享卷对应的 PV 名，第 3 步查；
+   - `HW`：`h100`、`h200` 或 `b200`。控制台标价 $1.995/GPU·时的是 H100 抢占式。写错卡型会按另一种卡的缩小版和长度跑。
 
 kit 只支持 2 个节点，不要建 32 卡。
 
 ## 2. 建集群（Together 控制台）
 
-- 抢占式 16 卡，也就是 2 个节点；编排选 Kubernetes。驱动用默认的。
+- 抢占式 16 卡，也就是 2 个节点；编排选 Kubernetes。驱动用默认的（11-08 是 610 / CUDA 13.3）。
 - 如果控制台要求至少一个按需（standard）节点，就建 1 个按需节点加 1 个抢占式节点，两个 pod 一边一个，清单里的 `nodeSelector` 保持注释。
 - 共享卷 500 GiB 左右，跟集群一起建，记下卷名。卷能扩不能缩。
 
@@ -72,17 +100,30 @@ bash $K8S status
 
 ## 4. pod 起来以后自动做的事
 
+### 4.1 快速路径（清单的默认值）
+
 不用手动操作，按顺序：
 
 1. **容器包**（每次启动，1 到 2 分钟）：git、编译器、rdma-core、libibverbs、perftest。
-2. **共享 setup**（第一次，10 到 15 分钟；一个 pod 装，另一个等）：venv、torch nightly、titan 分支 `phase14_multinode_5d` 固定在 `env.sh` 的 `BRANCH_SHA`。
-3. **采样器** `monitor.py`：每个节点每 2 秒记 GPU 和每个 IB 口的速率，之后一直开着。
-4. **通信检查 `comm`**（约 5 分钟），见第 7.2 节：
-   1. 每个 IB 口的 RDMA 原始带宽；
-   2. NCCL 走没走 IB、有没有 GPUDirect RDMA；
-   3. 256 B 到 1 GiB 的 busbw 和 α–β 拟合。
-5. **tokenizer**（约 2 分钟）。K3 的转换失败时，自动退到 Qwen3 的 tokenizer。
-6. **矩阵的每一行**依次跑四个阶段：
+2. **共享 setup**（第一次约 10 到 15 分钟；一个 pod 装，另一个等）：venv、torch nightly、titan 分支 `phase14_multinode_5d` 固定在 `env.sh` 的 `BRANCH_SHA`。共享卷上已有 `SETUP_OK` 并且提交号一致时跳过。
+3. **采样器** `monitor.py`：每个节点每 2 秒记一次每张卡的利用率、显存、功耗、SM 频率、温度和降频原因，之后一直开着。
+4. **tokenizer**（约 2 分钟）。K3 的转换失败时，自动退到 Qwen3 的 tokenizer。
+5. **矩阵的每一行跑一次 measure**：缩小版模型，c4，16K，5 步，第 5 步所有 rank 写 trace，TensorBoard。每步约 512K token，随机初始化，AdamW，fp32 主参数加 bf16 计算。这是吞吐和通信的测量，不是真训练。OOM 的行减半重跑，失败两次的行放弃，流水线接着跑下一行。
+6. **收尾：** 写 `measure/summary.tsv`、`monitor_summary.tsv`、measure 的 `trace_report*.tsv`、`REPORT.txt` 和 `ALL_DONE`。之后 pod 空转，但照样计费。
+
+被抢占时，换上来的 pod 会从第一个没完成的任务接着跑，被打断的那次不算失败（`K8S_RUN.md` 第 5 节）。
+
+### 4.2 完整研究（按需打开）
+
+清单里改这几项（或者 pod 起来以后用 `bash $K8S scope ...` 再 `bash $K8S retask`）：
+
+| 变量 | 改成 | 多出来的 |
+|---|---|---|
+| `MN_STAGES` | `smoke probe warm measure` | 每行四个阶段（下表） |
+| `MN_COMM` | `1` | 第一个任务是通信检查（第 7.2 节），矩阵跑完后做 NCCL 调优扫描（第 7.3 节，约 20 分钟；`MN_COMM_SWEEP=0` 单独关掉扫描） |
+| `MN_SEQ_FORCE` | 删掉 | 用矩阵里每种卡的长度，probe 定下每行能放下的长度 |
+| `MN_COMPILE` | 删掉 | 编译局部区域，flex attention autotune；MFU 是调过的口径，每种布局多十几分钟编译 |
+| `MEAS_STEPS`、`PROFILE_FREQ` | 删掉 | 30 步，第 25 步出 trace |
 
 | 阶段 | 模型 | 数据 | 步数 | 顺带记录 |
 |---|---|---|---|---|
@@ -91,11 +132,32 @@ bash $K8S status
 | warm | 缩小版，probe 定下的长度 | c4 | 10 | 填满这个模型所有行共用的编译 cache |
 | measure | 同上 | c4 | 30 | 第 25 步所有 rank 的 profiler trace，TensorBoard |
 
-   每步约 512K token，随机初始化，AdamW，fp32 主参数加 bf16 计算。这是吞吐和通信的测量，不是真训练。
-7. **NCCL 调优扫描**（`MN_COMM_SWEEP=1`，约 20 分钟），见第 7.3 节。
-8. **收尾：** 生成每个阶段的 `summary.tsv`、`monitor_summary.tsv`、`comm_compare.tsv`、measure 的 `trace_report*.tsv`、`REPORT.txt` 和 `ALL_DONE`。之后 pod 空转，但照样计费。
+两个模型、全矩阵、四个阶段约 8 到 10 小时（纸面估计）。
 
-被抢占时，换上来的 pod 会从第一个没完成的任务接着跑，被打断的那次不算失败（`K8S_RUN.md` 第 5 节）。
+### 4.3 跑的时候看什么
+
+- **`bash $K8S dash`**（浏览器开 `http://localhost:8765`）：
+  - 正在跑的那一格每步的 MFU、tps 和步时间；
+  - 16 个 rank 各自的最新一步；非最后一个 PP stage 的 rank 没有 loss，显示 "no loss stage"；
+  - 每张卡的 DCGM：SM 活跃度、Tensor Core 活跃度、显存、功耗、NVLink 和 PCIe 速率；
+  - 两个节点的训练日志（可以只看步数行或报错），通信结论，这一格的 profiler 文件。
+- **`bash $K8S tail 0|1 [steps]`**：在写日志的那个 pod 里跟踪 node 0 或 node 1 的日志。不要从另一个 pod 读共享卷上的日志，NFS 的缓存会让它停在旧的长度。
+- **显存不均匀是正常的**：1F1B 下第一个 PP stage 存的激活最多，11-08 的 `k3_A` 是 node 0 62 GiB，node 1 52 GiB。
+- **先看有没有过热降频的卡：**
+  - 11-08 node 1 的 GPU 5（rank 13）在四格 measure 里都到 88 到 90°C，其他 15 张卡不超过 58°C；
+  - 它有 18% 到 40% 的采样处于软件热降频（原因码 `0x20`），SM 频率最低掉到 345 MHz；
+  - 每个 collective 都要等最慢的 rank，所以一张卡降频，整格都跟着慢；
+  - 能看出这种卡的地方：`monitor_summary.tsv` 的 `sm_mhz_min` 和 `throttle_pct`，`gpu_node*.csv` 的 `temp_c` 和 `reasons`，`trace_report_rank.tsv` 里 `compute_ms` 特别大的 rank；
+  - 看到了就在结果里注明，严重的话找 Together 换节点。
+
+### 4.4 跑完以后（`ALL_DONE`）
+
+1. `bash $K8S report`：measure 每格一行的时间拆分。
+2. `bash $K8S fetch h100 $R/raw`：整份拉回本机（日志、trace、TensorBoard、NCCL 日志、监控）。另外把 `/mnt/shared/p14/` 下的 `setup_*.log`、`scope.env` 和流水线日志放进 `$R/raw/top/`（用 `bash $K8S shell 0` 打包，或者 `kubectl exec ... cat`）。
+3. 本机检查每个 trace 能不能读、出报告、合成 trace（第 6.2 节），写 `$R/README.md`。
+4. 确认 `raw/` 完整（文件数和大小与共享卷一致）后，在控制台删集群（第 8 节）。
+
+**不要在 rank 写 trace 时杀进程。** 最后一步之后每个 rank 要花 1 分钟以上写 trace，这时杀掉会留下截断、读不了的文件。11-08 的 4096 那次 `k3_5d` measure 就是这样丢了全部 16 个 trace。`bash $K8S kill` 现在会在还有 rank 在写 trace 时拒绝执行（`kill force` 强制）。
 
 ## 5. 每一种并行配置
 
@@ -130,7 +192,7 @@ M3（`matrix_m3.tsv`，没有 CP，TP 最多 4）：
 
 可以直接比的对照组：`k3_D` 和 `k3_D_ulysses`；`k3_B` 和 `k3_B_ep16`；`k3_B_keep` 和 `k3_B_ep16_keep`；`m3_B` 和 `m3_B_ep16`。它们的长度相同，FSDP 模式也相同。H100 上的 `k3_B`（64K，每层 reshard）和 `k3_B_keep`（32K，整步不 reshard）长度不同，不能直接比。
 
-长度都是纸面估计，probe 会自动缩短放不下的行。
+长度都是纸面估计，probe 会自动缩短放不下的行。快速路径不用这几列，所有行都跑 `MN_SEQ_FORCE`（16K）。11-08 在 H100、eager、VPP 2 下，`k3_A`、`k3_B`、`k3_C`、`k3_D` 的 16K 都放得下（峰值显存最多 62 GiB）。
 
 ### 5.2 命令
 
@@ -149,7 +211,7 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_MICROBATCHES=<n>`：每个 dp rank 的 micro-batch 数，默认取最接近每步 512K token 的值；
 - `MN_VPP=<v>`：PP 的格子用 `Interleaved1F1B`，每个 rank v 个虚拟 stage；层数切不出这么多时降到能整除的最大值（K3 缩小版 29 层在 pp 2 下能到 4，debug 小模型只能到 2），实际值打印在 `node0.log` 的 `[multinode_5d]` 那一行；
 - `MN_NCCL_TIMEOUT=<秒>`：第 1 步以后的 NCCL 超时；有 rank 在存显存快照或 trace 的阶段（probe、measure）不低于 120 秒，否则会把正常的运行判成超时；`MN_NCCL_INIT_TIMEOUT` 管初始化和第 1 步（默认 300）；
-- `MN_SEQ_FORCE=<n>`（写进 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；
+- `MN_SEQ_FORCE=<n>`（清单或 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；没有 probe 的时候，warm 和 measure 自己在 OOM 后减半重试；
 - `MN_COMPILE=0`：K3 的局部编译区改成 eager，flex attention 不做 autotune（flex 不能完全不编译，长序列 eager 会 OOM）；省编译时间，但 kernel 没调优，MFU 偏低；
 - 任何 `NCCL_*` 变量（第 7.4 节）；
 - `h200:VAR=值`：只在这种卡上生效；
@@ -192,10 +254,11 @@ tokenizer 的实际路径和 special token 的设置记在 `runs/<hw>/pipeline/a
 |---|---|---|
 | 每个 rank 每步的 loss、tps、TFLOPS、MFU、峰值显存 | 所有阶段 | `<stage>/<行>/node*.log`，汇总在 `<stage>/summary.tsv` |
 | 显存快照（每个节点的 local rank 0） | probe 第 2 步，以及 OOM 时 | `probe/<行>/tt/profiling/memory_snapshot/` |
-| 所有 rank 的 CPU 和 CUDA trace | measure 第 25 步 | `measure/<行>/tt/profiling/traces/iteration_25/` |
+| 所有 rank 的 CPU 和 CUDA trace | measure 第 `PROFILE_FREQ` 步（快速路径第 5 步，完整研究第 25 步） | `measure/<行>/tt/profiling/traces/iteration_<步>/` |
 | TensorBoard（最后一个 PP stage 的 rank） | measure | `measure/<行>/tt/tb/` |
 | 每个节点的 GPU 和 IB / RoCE 速率，标着任务 | 一直 | `monitor/gpu_node*.csv`、`ib_node*.csv` |
 | NCCL flight recorder（卡死时 dump） | 所有运行 | `<stage>/<行>/tt/comm_traces/` |
+| NCCL 的 INFO 日志（`INIT`、`NET`：用了哪些 HCA、IB 还是 socket、有没有 GDR） | 所有运行 | `<stage>/<行>/nccl/<host>.<pid>.log`，结论在 `summary.tsv` 的 `net` 列 |
 
 实时的卡状态来自 Together 在每个节点上装的 DCGM exporter（`gpu-operator` 命名空间）。Together 的 pod 里读不到 IB 口的字节计数器（sysfs 没有 `counters`，`perfquery` 也超时），所以跨节点流量看 PCIe 速率：开了 GPUDirect RDMA，跨节点的数据从 GPU 经 PCIe 直接到网卡。
 
@@ -211,7 +274,20 @@ bash $K8S trace measure k3_5d     # 一格所有 rank 合成一份 trace，拉�
 bash $K8S tb                      # TensorBoard，浏览器开 http://localhost:6006
 bash $K8S fetch h200/probe/k3_5d/tt/profiling/memory_snapshot   # 显存快照，拖进 https://pytorch.org/memory_viz
 bash $K8S collect                 # 结果拉回本机（不含 trace 和 cache），每个阶段写 summary.tsv
+bash $K8S fetch h100 $R/raw       # 整份拉回本机（含 trace），之后的分析都在本机做
 ```
+
+本机分析（集群删掉以后也能做；`M=$R/raw/h100/measure`，手动跑的格子在 `$R/raw/h100/manual/measure`）：
+
+```sh
+for f in $M/*/tt/profiling/traces/*/rank*_trace.json.gz; do gzip -t $f || echo "truncated: $f"; done
+python phase14_multinode_5D_experiments/kit/trace_report.py $M --jobs 4     # 写 $M/trace_report*.tsv
+python phase14_multinode_5D_experiments/kit/summarize.py $M > $R/measure_summary.tsv
+python phase14_multinode_5D_experiments/kit/merge_traces.py $M/<格> --out $R/<格>_measure_trace.json.gz   # 拖进 ui.perfetto.dev
+tensorboard --logdir $M/<格>/tt/tb
+```
+
+截断的 trace 读不了，`trace_report.py` 和 `merge_traces.py` 会跳过它们并说明是哪些 rank。Windows 上先 `export PYTHONUTF8=1`。
 
 ### 6.3 怎么读
 
@@ -226,8 +302,9 @@ bash $K8S collect                 # 结果拉回本机（不含 trace 和 cache�
 - `trace_report_rank.tsv`：每个 rank 一行，用来找慢 rank。
 - 两点注意：
   - NCCL kernel 的时间包含等对方的时间，所以 PP 那一行含气泡等待，EP 那一行含路由不均，`eff_busbw` 是下限；
-  - 第一次拿到真 trace，先看 `unattributed_pct`。进程组是靠 `record_param_comms` 对上的，只在合成 trace 上测过，不是 0 就要先修 `trace_report.py`。
+  - trace 里的进程组只有哈希名、组大小和组内 rank，`trace_report.py` 按格子的 mesh 推出每个组的成员，标成 TP、CP、FSDP、EP 这些名字；几个维度成员相同时合成一个标签（如 `FSDP/LOSS`、`CPxTP/EP`）。11-08 的四格 `unattributed_pct` 都是 0。
 - 第 5.1 节的"report 里看"一列，就是每一行该看的列；对照组看两行同一列的差值。
+- 一步一步怎么在 Perfetto 里看 trace、11-08 每格的数和结论：`../results/20261108_h100_together/README.md`。
 
 ## 7. NCCL / RDMA
 
@@ -238,11 +315,14 @@ bash $K8S collect                 # 结果拉回本机（不含 trace 和 cache�
   - Together：bootstrap 和 Gloo 走 `eth0`，NCCL 自己找 HCA；
   - Nebius：另加 `NCCL_IB_HCA=mlx5`、`UCX_NET_DEVICES=eth0`、`SHARP_COLL_ENABLE_PCI_RELAXED_ORDERING=1`、`NCCL_COLLNET_ENABLE=0`；
   - A100：`NCCL_NVLS_ENABLE=0`。
-- **日志级别：** 训练时 `NCCL_DEBUG=WARN`；`comm` 任务用 `INFO`，打印 `INIT`、`NET`、`ENV`、`TUNING` 几个子系统，`TUNING` 会把 NCCL 自己的算法和协议延迟、带宽模型打出来，可以和 α–β 拟合对照。
+- **Together 的 HCA：** 11-08 的 H100 节点除了 8 个 IB 口，还有两个 200G RoCE 前端口（`mlx5_4`、`mlx5_5`）。`MN_NET=together` 时 `env.sh` 读 `/sys/class/infiniband/*/ports/1/link_layer`，只把 InfiniBand 的口交给 NCCL（`NCCL_IB_HCA==mlx5_0,...`，`=` 开头是精确匹配）。
+- **日志级别：** 训练时 NCCL 用 `INFO`，只开 `INIT`、`NET` 两个子系统，每个进程写进那一格的 `nccl/<host>.<pid>.log`，不进 `node*.log`（WARN 也在这些文件里）；`MN_NCCL_INFO=0` 时回到 `NCCL_DEBUG=WARN`，打在 `node*.log` 里。`comm` 任务用 `INFO`，打印 `INIT`、`NET`、`ENV`、`TUNING` 几个子系统，`TUNING` 会把 NCCL 自己的算法和协议延迟、带宽模型打出来，可以和 α–β 拟合对照。
 
-### 7.2 验证（`comm` 任务自动做）
+### 7.2 验证（`comm` 任务，`MN_COMM=1` 时自动做）
 
-`bash $K8S comm` 打印每个节点的结论和调优对比表。按这个顺序看：
+快速路径不跑这一步：每一格的 `net` 列已经说明 NCCL 走的是 IB 还是 socket、有没有 GDR。11-08 跑过一次的结论：8 个 IB 口全部用上，有 GPUDirect RDMA；每个口 RDMA 原始带宽约 365 Gb/s；16 卡 1 GiB all_reduce busbw 439 GB/s；跨节点 alltoall 只有 91 GB/s，节点内 330 GB/s；跨节点 sendrecv 43 GB/s。原始结果在 `../results/20261108_h100_together/raw/h100/comm/`（不进 git）。
+
+要重跑时 `bash $K8S comm` 打印每个节点的结论和调优对比表。按这个顺序看：
 
 1. **RDMA 原始带宽：** 每个 IB 口单独用 `ib_write_bw` 测（主机内存，node 1 写到 node 0，不经过 NCCL）。每个口应该接近链路速率；Together 健康检查的阈值是每个设备 320 Gb/s。
 2. **`InfiniBand: yes`：** NCCL 用了 IB。如果是 NO，按 `together/README.md` 第 4 节排查。
@@ -250,7 +330,7 @@ bash $K8S collect                 # 结果拉回本机（不含 trace 和 cache�
 4. **busbw（256 MiB 以上）：** 16 卡 all_reduce 的参考值：Together 健康检查的多节点阈值 330 GB/s，Nebius 文档里 nccl-tests 的例子平均 317 GB/s。
 5. **α–β 拟合：** 每个 op、每个组一行，`alpha us` 是延迟，`busbw` 是大消息的极限。这些是经过 torch.distributed 测的，α 含每次调用的开销，比 nccl-tests 测到的大。
 
-### 7.3 调优扫描（`comm_sweep.tsv`，`MN_COMM_SWEEP=1` 时自动做）
+### 7.3 调优扫描（`comm_sweep.tsv`，`MN_COMM=1` 时自动做，`MN_COMM_SWEEP=0` 单独关掉）
 
 每个变体只改 NCCL 的一个设置，然后完整重测一次 `comm_bench`，结果写在 `runs/<hw>/comm_<tag>/`；`comm_compare.tsv` 把每个变体和 NCCL 默认选择放在一起比。
 
@@ -302,7 +382,7 @@ bash $K8S start
 
 ## 8. 收尾
 
-1. `bash $K8S status` 显示 `ALL_DONE`（或者你决定停在这里），然后 `bash $K8S collect`，把结果拉回本机。
+1. `bash $K8S status` 显示 `ALL_DONE`（或者你决定停在这里），然后 `bash $K8S fetch h100 $R/raw`，把整份运行文件拉回本机（`raw/` 被 `results/.gitignore` 排除，不进 git）。只要结果、不要 trace 时用 `bash $K8S collect $R`。
 2. 要带回 logbook 的，放在 `phase14_multinode_5D_experiments/results/<日期>_<hw>/` 下：
    - 每个阶段的 `summary.tsv`；
    - measure 的 `trace_report*.tsv`；
@@ -311,7 +391,7 @@ bash $K8S start
    - `pipeline/REPORT.txt`；
    - 每格的 `env_node*.txt` 和 `tree.txt`。
 
-   再写一份说明：卡型、网络、titan 提交号、`comm` 的结论。trace 和显存快照太大，需要的格子用 `fetch` 单独拉。
+   再写一份说明 `README.md`：卡型、网络、titan 提交号、每格的数、慢 rank 和降频的卡。trace、显存快照和完整日志只留在 `raw/`；合成后的 trace（`*.json.gz`）也不进 git。
 3. 在控制台删集群。集群不能暂停，只能删除；删集群时不勾 "Delete attached shared volume"，共享卷就会保留。
 4. 处理共享卷：几天内还要跑，就留着，venv 和编译 cache 下次能直接用；不跑了就删，它一直按月计费。
 
@@ -342,3 +422,10 @@ Together 的集群不能暂停，停止计费只能删集群。共享卷默认�
 | 节点被抢占 | `bash $K8S status` 里两个节点的心跳 | 自动续跑；节点一直不回来就在控制台看容量 |
 | report 的 `unattributed_pct` 不是 0 | `trace_report_pg.tsv` 里 `?` 那一行 | 用 `trace` 拉一格看 NCCL kernel 的参数，修 `trace_report.py` |
 | 余额快用完 | Together 控制台 | 先 `collect`；余额用完时集群会被立刻暂停 |
+| setup 一开始就退出，日志最后是 `CUDA_DRV=` | `setup_*.log` | 610 驱动的 `nvidia-smi` 写的是 `CUDA UMD Version`，`setup.sh` 已经两种都认；换了驱动又出现时看 `nvidia-smi` 的表头 |
+| 一个节点 OOM 退出，另一个节点不动 | 两个节点的 `node*.log` | 另一个节点卡在 NCCL 里，要等初始化超时（300 秒）；流水线的看门狗和 `k8s.sh cell` 会在 60 秒后杀掉它 |
+| `tail` 看不到新日志 | 日志在哪个 pod 写 | 用 `bash $K8S tail 0` / `tail 1` 或 dashboard，它们在写日志的那个 pod 里读 |
+| 某格比同类慢很多，或者 rank 之间 `compute_ms` 差很多 | `trace_report_rank.tsv`、`gpu_node*.csv` 的 `temp_c` 和 `reasons` | 先排除降频的卡（第 4.3 节），再看并行布局 |
+| trace 读不了（`gzip -t` 报错） | 写 trace 时有没有被杀 | 没法恢复，只能重跑这一格；以后等 `Finished dumping profiler traces` 出现在所有 rank 再停 |
+| 非最后一个 PP stage 的 rank 的 loss 是负数（如 -2、-4） | — | 正常：那些 rank 不算 loss，titan 打印的是占位值 |
+| Windows 新终端里 `kubectl: command not found` | — | 直接用 `bash $K8S ...`，它会找到 winget 装的 `kubectl`；要直接用 `kubectl` 就把它的目录加进 `PATH` |

@@ -1,6 +1,6 @@
 # k8s 上两个 pod 的无人值守流程（Nebius、Together 共用，2026-11-07）
 
-完整流程从 `PLAYBOOK.md` 开始，这里是运维细节。集群和 pod 怎么准备，见 `nebius/README.md` 或 `together/README.md`。pod 起来以后的事，两家一样，都在这里。**这套流程只在本机模拟过两个节点的协同（正常完成、probe OOM 减半、任意一个节点中途被杀再重启），还没在真集群上跑过。**
+完整流程从 `PLAYBOOK.md` 开始，这里是运维细节。集群和 pod 怎么准备，见 `nebius/README.md` 或 `together/README.md`。pod 起来以后的事，两家一样，都在这里。**2026-11-08 在 Together 的 2 × 8 H100 上跑过：setup、tokenizer、通信检查由流水线完成，四行 measure 是用 `k8s.sh cell` 手动逐格跑的（设置和清单现在的默认值相同）。清单默认的快速路径（`MN_STAGES=measure`、`MN_COMM=0`、`MN_SEQ_FORCE`）由 `pipeline.py` 自己连续跑完，这一点只在本机模拟过。**
 
 ## 1. pod 起来后自动做什么
 
@@ -9,11 +9,11 @@
   2. 共享存储上的 setup：venv、torch nightly、titan 分支 `phase14_multinode_5d`。只让一个 pod 做，另一个等；
   3. 启动 GPU 和 IB 采样器 `monitor.py`，再启动 `pipeline.py`；流水线崩了就自动重启，直到全部完成或者有 `STOP` 文件。
 - **pipeline.py** 按固定顺序跑：
-  - `comm`：两节点通信检查，判断 IB 和 GPUDirect RDMA，测 busbw；
+  - `comm`（`MN_COMM=1` 时）：两节点通信检查，判断 IB 和 GPUDirect RDMA，测 busbw；快速路径不跑，每一格自己的 NCCL INFO 日志（`<格>/nccl/`）给出同样的 IB / GDR 结论；
   - `assets.k3`、`assets.m3`：准备 tokenizer；K3 的转换失败时，自动退到 Qwen3 的 tokenizer；
-  - 矩阵的每一行依次跑 smoke、probe、warm、measure（`MN_ORDER=row`，默认）。设 `MN_ROWS=k3_5d`，就只跑 5D 全开这一行。
+  - 矩阵的每一行依次跑 `MN_STAGES` 里的阶段（`MN_ORDER=row`，默认）。清单默认只有 measure；完整研究是 smoke、probe、warm、measure。设 `MN_ROWS=k3_5d`，就只跑 5D 全开这一行。
 - **断点续跑：** 状态放在共享存储的 `<BASE>/runs/<hw>/pipeline/` 下。pod 被抢占、重建以后，从第一个没完成的任务接着跑；被打断的那次尝试不计入失败。
-- **自动调长度：** probe 遇到 OOM 时把长度减半重试（最低 4096），warm 和 measure 用 probe 最后定下的长度。
+- **自动调长度：** probe 遇到 OOM 时把长度减半重试（最低 4096），warm 和 measure 用 probe 最后定下的长度。这一行没有 probe 任务时（快速路径），warm 和 measure 自己在 OOM 后减半重试。
 - **失败处理：** 一格连续真失败 2 次（`MN_MAX_FAILS`），就放弃这一格，同时跳过它后面的阶段，继续下一格。
 - **收尾：** 写出 `REPORT.txt`、每个阶段的 `summary.tsv`、采样汇总、measure 的 trace 报告（第 4 节）和 `ALL_DONE`。pod 不退出，方便收集结果。
 
@@ -62,7 +62,7 @@ bash $K8S both "MN_MODEL=k3 MN_FLAVOR=k3_16x141g MN_ASSETS=/mnt/shared/p14/asset
 运行中自动记录的：
 - **每步指标：** 每个 rank 每步的 loss、tps、TFLOPS、MFU、峰值显存，都在日志里。MFU 是 titan 的口径：(6 × 激活参数 + MLA 和 KDA 的注意力算子 FLOPs) × tps ÷ bf16 稠密峰值，和 multinode.md 的纸面口径一致。
 - **显存快照：** probe 的第 2 步，每个节点的 local rank 0 各存一份；OOM 时也存。
-- **trace 和 TensorBoard：** measure 的第 25 步，所有 rank 都录 CPU 和 CUDA 事件；measure 同时写 TensorBoard。
+- **trace 和 TensorBoard：** measure 的第 `PROFILE_FREQ` 步（快速路径第 5 步，默认第 25 步），所有 rank 都录 CPU 和 CUDA 事件；measure 同时写 TensorBoard。
 - **节点采样：** 每个节点每 2 秒记一次 GPU（利用率、显存、功耗、SM 频率、降频原因）和每个 IB / RoCE 口的收发速率，每行标着当时在跑的任务。
 - **通信基线：** `comm` 从 256 B 扫到 1 GiB，并给每个 op、每个组拟合 α–β。
 
@@ -86,7 +86,7 @@ bash $K8S fetch h200/probe/k3_5d/tt/profiling/memory_snapshot   # 显存快照�
 - `trace_report_rank.tsv`：每个 rank 一行，用来找慢 rank。
 - 两点注意：
   - NCCL kernel 的时间包含等对方的时间，所以 PP 那一行含气泡等待，EP 那一行含路由不均，`eff_busbw` 是下限；
-  - 进程组是靠 trace 里的 `record_param_comms` 对上的，只在合成 trace 上测过。第一次拿到真 trace 先看 `unattributed_pct`：不是 0，就说明有 NCCL kernel 没对上，要先修 `trace_report.py`。
+  - trace 里的进程组只有哈希名、组大小和组内 rank，`trace_report.py` 按格子的 mesh 推出每个组的成员，再标成 TP、CP、FSDP、EP 这些名字；几个维度成员相同时合成一个标签（如 `FSDP/LOSS`）。`unattributed_pct` 不是 0，说明有 NCCL kernel 没对上；11-08 的四格都是 0。
 
 ## 5. 被抢占时会发生什么
 
@@ -98,8 +98,8 @@ bash $K8S fetch h200/probe/k3_5d/tt/profiling/memory_snapshot   # 显存快照�
 ## 6. 第一次先看什么
 
 1. `bash $K8S status` 显示 `setup: done`。
-2. comm 的结论（`status` 也会显示）：要有 `InfiniBand: yes` 和 `GPUDirect RDMA: yes`。16 卡 all_reduce 的大消息 busbw 参考：Nebius 文档里 nccl-tests 的例子平均 317 GB/s（文档说高于 300 正常），Together 健康检查的多节点阈值是 330 GB/s。
-3. 第一格的 smoke 跑完（`k3.smoke.k3_5d: done`）。
+2. 网络：快速路径看第一格 `summary.tsv` 的 `net` 列，要是 `IB+GDR`；跑了 `comm` 的话看它的结论（`status` 也会显示），要有 `InfiniBand: yes` 和 `GPUDirect RDMA: yes`。16 卡 all_reduce 的大消息 busbw 参考：Nebius 文档里 nccl-tests 的例子平均 317 GB/s（文档说高于 300 正常），Together 健康检查的多节点阈值是 330 GB/s。
+3. 第一格跑完（快速路径是 `k3.measure.k3_5d: done`），`bash $K8S dash` 里没有过热降频的卡（`PLAYBOOK.md` 第 4.3 节）。
 4. 之后定期 `collect`。
 
 `InfiniBand: NO` 时，按各自 README 里的排查步骤处理。

@@ -62,10 +62,20 @@ def cell_rows(cell: Path) -> tuple[list[dict], bool]:
     return rows, oom
 
 
+def network(cell: Path) -> str:
+    """NCCL's transport from the run's NCCL INFO files (launch.sh): IB+GDR, IB, Socket, or - when not recorded."""
+    text = "".join(p.read_text(errors="replace") for p in cell.glob("nccl/*.log"))
+    if not text:
+        return "-"
+    if "NET/IB : Using" in text:
+        return "IB+GDR" if re.search(r"NET/IB/\d+/GDRDMA", text) else "IB"
+    return "Socket" if "NET/Socket : Using" in text else "?"
+
+
 def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
     rows, oom = cell_rows(cell)
     rcs = ",".join(p.read_text().strip() for p in sorted(cell.glob("rc_node*"))) or "-"
-    out = dict(cell=cell.name, rc=rcs, oom="OOM" if oom else "", steps=0)
+    out = dict(cell=cell.name, rc=rcs, oom="OOM" if oom else "", steps=0, net=network(cell))
     if not rows:
         return out
     steps = sorted({r["step"] for r in rows})
@@ -103,7 +113,7 @@ def main() -> None:
     args = parser.parse_args()
     columns = [
         "cell", "rc", "oom", "steps", "loss_first", "loss_last",
-        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s",
+        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s", "net",
     ]
     print("\t".join(columns))
     for cell in sorted(p for p in args.stage_dir.iterdir() if p.is_dir()):

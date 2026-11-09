@@ -2,7 +2,7 @@
 
 2026-10-28，CPU 会话按 `../multinode.md` 准备（用户："把里面设置的对应titan脚本和新开的titan实验分支全部准备好，里面还缺一个配置，A100 80G；准备两个模型Kimi K3 downscale和Minimax M3 downscale"）。
 
-**完整流程（Together k8s 上从开集群到出结果、每种并行配置的命令、profiler、NCCL / RDMA 调优）看 `PLAYBOOK.md`。** **本 kit 一步都还没跑过。** 代码只在 Windows 上做了 `py_compile` 和 black；titan 的模块在本机 import 不了（`models/common` 要 CuTeDSL），第一次上机先跑 smoke。
+**完整流程（Together k8s 上从开集群到出结果、每种并行配置的命令、profiler、NCCL / RDMA 调优）看 `PLAYBOOK.md`。** **2026-11-08 在 Together 的 2 × 8 H100 上跑过 K3 的 `k3_A`、`k3_B`、`k3_C`、`k3_D` 四行（16K、eager、VPP 2、5 步），结果和 trace 的读法在 `../results/20261108_h100_together/README.md`。** 以后租卡默认走 `PLAYBOOK.md` 第 0 节的快速路径。`k3_5d` 只在 4096、VPP 4 下跑过 measure（trace 在写的时候被杀，全部截断）；`k3_D_ulysses` 和三行 `k3_B_*` 对照，以及整个 M3 矩阵，还没在真集群上跑过。
 
 ## 1. titan 分支
 
@@ -93,7 +93,6 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 
 ## 5. 还没验证、上机先看的
 
-- **trace 报告：** `trace_report.py` 只在合成 trace 上测过，进程组是靠 trace 里的 `record_param_comms` 对上的。第一次拿到真 trace，先看 `unattributed_pct` 是不是 0。
 - **K3 的 tokenizer：** titan 只认 `tokenizer.json` 或 vocab + merges，Kimi 的仓库很可能只有 tiktoken。`make_kimi_tokenizer.py` 是按 transformers 的 `TikTokenConverter` 写的，没跑过。
 - **K3 的纯文本数据：** recipe 用的是 M3 kit 跑过的 packed c4（`ConcatThenSplitPackingConfig` + `c4_document_capacity`）。K3 的测试一直用多模态 loader，纯文本 batch 走 dummy 视觉前向这条路在 K3 上没在 kit 里跑过。
 - **A100 的 reference 门控：** multinode.md §9.1 在 4070 Ti 上用本地改动跑过 debugmodel，本分支的 `gate_impl` 开关还没跑过。
@@ -113,7 +112,8 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型的组合和每种卡的长度 |
 | `summarize.py` | 解析日志，出每格一行的 TSV |
 | `trace_report.py`、`merge_traces.py` | 每格 trace 的时间拆分（计算、按进程组的暴露通信、拷贝、空闲，并入 tps、MFU、显存和 IB 速率）；一格所有 rank 合成一份 Perfetto trace |
-| `monitor.py` | 每个节点的 GPU 和 IB 采样器；`--show` 看最新一次，`--summary` 按任务汇总 |
+| `monitor.py` | 每个节点的 GPU 和 IB 采样器（含温度和降频原因）；`--show` 加 DCGM 看最新一次，`--summary` 按任务汇总 |
+| `dashboard.py` | pod 0 上的实时网页（`k8s.sh dash`）：每步 MFU / tps / 步时间、每个 rank 的最新一步、DCGM、两个节点的日志 |
 | `PLAYBOOK.md` | 完整流程：步骤、每种并行配置的命令、profiler、NCCL / RDMA 验证和调优 |
 | `rdma_bw.sh` | 每个 IB 口的 RDMA 原始带宽（perftest 的 `ib_write_bw`，不经过 NCCL），`run_comm.sh` 先跑它 |
 | `comm_sweep.tsv`、`comm_compare.py` | NCCL 调优变体（每行一个设置）；各变体和 NCCL 默认选择的 α、busbw 对比 |
@@ -123,7 +123,7 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `K8S_RUN.md` | k8s 上两个 pod 的无人值守流程（Nebius、Together 共用）：自动做什么、手动操作、状态文件、抢占 |
 | `nebius/README.md`、`nebius/p14_pods.yaml` | Nebius：建 GPU cluster、共享文件系统、node group 和 CSI，pod 清单 |
 | `together/README.md`、`together/p14_pods.yaml` | Together：建集群、kubeconfig、共享卷，pod 清单 |
-| `k8s.sh` | 本机操控两个 pod：status、logs、stop / kill / start、sync、retask、collect、both |
+| `k8s.sh` | 本机操控两个 pod：status、logs、stop / kill / start、sync、retask、scope、collect、fetch、dash、top / watch、tail、report、trace、tb、cell、both |
 | `bootstrap.sh` | pod 的入口：容器包、共享 setup（加锁）、流水线（崩了自动重启） |
 | `pipeline.py` | 无人值守流水线：comm、tokenizer、每行 smoke / probe / warm / measure；断点续跑、OOM 自动减半、两节点心跳协同 |
 | `setup_node.sh`、`assets.sh` | 每个容器的系统包和 IB 报告；两个模型的 tokenizer（K3 转换失败时退到 Qwen3） |

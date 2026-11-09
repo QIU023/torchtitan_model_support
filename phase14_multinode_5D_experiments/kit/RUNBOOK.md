@@ -2,7 +2,16 @@
 
 照着从上往下复制粘贴。**node 0**、**node 1** 标的是在哪台机器上执行；"两台"表示两台都要执行，而且同一步要在一两分钟内一起开始（torchrun 会等另一台来 rendezvous）。
 
-**Nebius 或 Together 的 k8s pod，不看这一份**：先按 `nebius/README.md` 或 `together/README.md` 建集群、拉起 pod，pod 起来以后流水线会自动跑完全部阶段（`K8S_RUN.md`），本机用 `k8s.sh` 看进度、收结果。
+**Nebius 或 Together 的 k8s pod，不看这一份**：按 `PLAYBOOK.md` 第 0 节的快速路径走（2026-11-08 在 Together 上跑过的配置），pod 起来以后流水线自动跑完，本机用 `k8s.sh` 看进度、收结果。
+
+**裸机或 VM 上的快速路径：** 第 2、3 步做完以后，跳过第 4 到 7 步里的通信、smoke、probe、warm，准备好 tokenizer（第 7 步开头），两台一起：
+
+```sh
+export MN_SEQ_FORCE=16384 MN_COMPILE=0 MN_VPP=2 MEAS_STEPS=5 PROFILE_FREQ=5
+bash $KIT/run_matrix.sh k3 measure
+```
+
+`run_matrix.sh` 不会在 OOM 后自动减半：OOM 的行用 `MN_SEQ_FORCE=8192 bash $KIT/run_matrix.sh k3 measure <行名>` 重跑。网络看每格 `nccl/` 下的 NCCL INFO 日志，`summarize.py` 的 `net` 列给出结论。
 
 ## 0. 先确定租什么
 
