@@ -5,7 +5,8 @@
 #   k8s.sh logs [n]            last n (30) pipeline log lines of both nodes
 #   k8s.sh shell <0|1>         interactive shell in pod 0 or 1
 #   k8s.sh stop                stop once the current attempt is over (pods stay up)
-#   k8s.sh kill                stop now: the current attempt is killed and will be rerun later
+#   k8s.sh kill [force]        stop now: the current attempt is killed and will be rerun later; refused while ranks
+#                              still write their profiler traces, unless force
 #   k8s.sh start               start the pipeline again (after stop or kill)
 #   k8s.sh retask              kill, forget the frozen task list (finished tasks stay finished), start; picks up
 #                              matrix edits made with sync and a scope set with scope
@@ -116,6 +117,18 @@ case "${1:-status}" in
   stop)
     on "$(any)" "touch $BASE/STOP" && echo "STOP set: both pipelines exit once the current attempt is over" ;;
   kill)
+    if [ "${2:-}" != force ]; then
+      # Killing a rank while it writes its trace leaves a truncated file (first Together measure, all 16 lost).
+      dumping=$(on "$(any)" "pgrep -f 'torchtita[n].train' > /dev/null || exit 0
+        f=\$(ls -t $RUNS/*/*/*/node0.log $RUNS/*/manual/*/*/node0.log 2>/dev/null | head -n 1)
+        [ -n \"\$f\" ] || exit 0; d=\$(dirname \$f)
+        a=\$(cat \$d/node*.log | grep -c 'Dumping profiler traces'); b=\$(cat \$d/node*.log | grep -c 'Finished dumping profiler traces')
+        [ \"\$a\" -gt \"\$b\" ] && echo \"\$d: \$((a - b)) ranks still writing\"; true")
+      if [ -n "$dumping" ]; then
+        echo "$dumping their profiler traces; wait for them, or k8s.sh kill force" >&2
+        exit 1
+      fi
+    fi
     killall_runs
     echo "killed; the pods stay up. k8s.sh start resumes (the killed attempt is rerun)" ;;
   start)

@@ -1,0 +1,4 @@
+# Run data fetched from the clusters (logs, traces, memory snapshots) stays local; only notes and tables are committed.
+*/raw/
+*.json.gz
+*.pickle
