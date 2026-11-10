@@ -4,6 +4,7 @@
 
 其他文件只放细节：
 - `PRACTICE_PLAN.md`：模拟文档和真机演练怎么配合，16 / 32 / 64 卡的练习顺序；
+- `TRACE_READING.md`：读懂 trace 的练习册，从时间线结构到 kernel 内部；
 - `together/README.md`：建集群、kubeconfig、IB 排查；
 - `K8S_RUN.md`：运维细节、状态文件、report 各列的定义；
 - `RUNBOOK.md`：不用 k8s、在裸机或 VM 上手动跑的版本；
@@ -366,6 +367,7 @@ tensorboard --logdir $M/<格>/tt/tb
 - `trace_report_pg.tsv`：暴露通信按进程组拆，标签有 TP、CP、EP、FSDP、EFSDP（专家 FSDP）、DPR（HSDP 副本）、PP、LOSS，另外给出每组的 `eff_busbw`。
 - `trace_report_rank.tsv`：每个 rank 一行，用来找慢 rank。
 - `trace_report_groups.tsv`：每个进程组的哈希名、标签和成员 rank。Perfetto 里点一个 NCCL kernel，参数里的 `Process Group Name` 就在这里查。
+- `trace_report_kernels.tsv`：每个 rank 的 kernel 时间按类分（GEMM、注意力、KDA、aten 逐元素、NCCL 等），计算流上 kernel 的个数和大小，PP 前向、反向动作的 GPU 时间；`trace_report_topk.tsv`：每格耗时最多的 20 个 kernel。读法和练习见 `TRACE_READING.md`。
 - 两点注意：
   - NCCL kernel 的时间包含等对方的时间，所以 PP 那一行含气泡等待，EP 那一行含路由不均，`eff_busbw` 是下限；
   - trace 里的进程组只有哈希名、组大小和组内 rank，`trace_report.py` 按格子的 mesh 推出每个组的成员，标成 TP、CP、FSDP、EP 这些名字；几个维度成员相同时合成一个标签（如 `FSDP/LOSS`、`CPxTP/EP`）。11-08 的四格 `unattributed_pct` 都是 0。

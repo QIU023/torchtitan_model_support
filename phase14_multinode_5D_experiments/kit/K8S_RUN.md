@@ -85,6 +85,7 @@ bash $K8S fetch h200/probe/k3_5d/tt/profiling/memory_snapshot   # 显存快照�
 - `trace_report_pg.tsv`：按进程组和 collective 拆。标签有 TP、CP、EP、FSDP、EFSDP（专家 FSDP）、DPR（HSDP 的副本）、PP、LOSS；`eff_busbw` 是消息字节数除以 kernel 时间，再按 nccl-tests 的系数折成 busbw，可以和 `comm` 的结果比。
 - `trace_report_rank.tsv`：每个 rank 一行，用来找慢 rank。
 - `trace_report_groups.tsv`：每个进程组的哈希名、标签和成员 rank。Perfetto 里点一个 NCCL kernel，参数里的 `Process Group Name` 就在这里查。
+- `trace_report_kernels.tsv`：每个 rank 的 kernel 时间按类分（GEMM、注意力、KDA、aten 逐元素、NCCL 等），计算流上 kernel 的个数和大小，PP 前向、反向动作的 GPU 时间；`trace_report_topk.tsv`：每格耗时最多的 20 个 kernel。读法和练习见 `TRACE_READING.md`。
 - 两点注意：
   - NCCL kernel 的时间包含等对方的时间，所以 PP 那一行含气泡等待，EP 那一行含路由不均，`eff_busbw` 是下限；
   - trace 里的进程组只有哈希名、组大小和组内 rank，`trace_report.py` 按格子的 mesh 推出每个组的成员，再标成 TP、CP、FSDP、EP 这些名字；几个维度成员相同时合成一个标签（如 `FSDP/LOSS`）。`unattributed_pct` 不是 0，说明有 NCCL kernel 没对上；11-08 的四格都是 0。

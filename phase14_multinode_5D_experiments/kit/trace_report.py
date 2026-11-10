@@ -8,8 +8,11 @@ that found none. An NCCL kernel's time includes waiting for its peers, so expose
 imbalance and pipeline bubbles, and eff_busbw (message bytes over kernel time, nccl-tests factors) is a lower bound.
 Writes trace_report.tsv (one row per cell, joined with summarize.py's tps / mfu / peak memory and monitor.py's
 InfiniBand rates), trace_report_pg.tsv (per cell, process group and collective), trace_report_rank.tsv (per cell
-and rank) and trace_report_groups.tsv (each process group's hashed name, as Perfetto shows it on an NCCL kernel, with
-its label and member ranks) into the stage directory, and prints the first.
+and rank), trace_report_groups.tsv (each process group's hashed name, as Perfetto shows it on an NCCL kernel, with
+its label and member ranks), trace_report_kernels.tsv (per cell and rank: kernel time by family, the compute stream's
+kernel count and sizes, and the GPU time of the pipeline schedule's forward and backward actions) and
+trace_report_topk.tsv (per cell, the kernels that take the most time) into the stage directory, and prints the first.
+A kernel's family comes from its name, except that kernels inside a kda/ GPU annotation count as KDA.
 """
 
 import argparse
@@ -52,6 +55,15 @@ RANK_COLUMNS = [
     "unattributed_ms",
 ]
 GROUP_COLUMNS = ["cell", "group", "label", "size", "ranks"]
+FAMILIES = ("gemm", "attention", "kda", "triton", "aten", "other", "copy", "nccl")
+KERNEL_COLUMNS = (
+    ["cell", "rank", "node", "window_ms", "kernels"]
+    + [f"{f}_ms" for f in FAMILIES]
+    + ["stream_kernels", "small_pct", "median_us", "pp_f_ms", "pp_b_ms", "pp_actions"]
+)
+TOPK_COLUMNS = ["cell", "family", "kernel", "per_rank", "ms_per_rank", "mean_us"]
+PP_ACTION = re.compile(r"PP:\d+([FB])\d+$")
+SMALL_US = 10.0
 
 
 def label_of(desc: str) -> str:
@@ -87,6 +99,23 @@ def message_bytes(args: dict) -> int:
     return nelems * elem
 
 
+def kernel_family(name: str, in_kda: bool) -> str:
+    n = name.lower()
+    if n.startswith("nccl"):
+        return "nccl"
+    if in_kda:
+        return "kda"
+    if "flex_attention" in n or "fmha" in n or "flash" in n:
+        return "attention"
+    if any(k in n for k in ("gemm", "cutlass", "nvjet", "xmma", "cublas")):
+        return "gemm"
+    if n.startswith("triton"):
+        return "triton"
+    if "at::native" in n:
+        return "aten"
+    return "other"
+
+
 def load_trace(path: Path) -> dict:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8") as f:
@@ -103,12 +132,23 @@ def analyze_rank(path_str: str) -> dict:
     comms: dict[tuple, list] = defaultdict(list)
     launches: dict = {}
     gpu = []
+    kda_spans: dict = defaultdict(list)
+    pp_us = {"F": 0.0, "B": 0.0}
+    pp_actions = 0
     for e in events:
         if e.get("ph") != "X":
             continue
         cat = e.get("cat")
         if cat in GPU_CATS:
             gpu.append(e)
+        elif cat == "gpu_user_annotation":
+            name, ts = str(e.get("name", "")), float(e["ts"])
+            if name.startswith("kda/"):
+                kda_spans[e.get("tid")].append((ts, ts + float(e.get("dur", 0))))
+            action = PP_ACTION.match(name)
+            if action:
+                pp_us[action.group(1)] += float(e.get("dur", 0))
+                pp_actions += 1
         elif cat in LAUNCH_CATS:
             corr = e.get("args", {}).get("correlation")
             if corr is not None:
@@ -137,6 +177,21 @@ def analyze_rank(path_str: str) -> dict:
         ts, end, op_args = comms[key][i]
         return op_args if launch[2] <= end or launch[2] - ts <= NEAR_US else None
 
+    kda_starts = {}
+    for tid, spans in kda_spans.items():
+        spans.sort()
+        kda_starts[tid] = [sp[0] for sp in spans]
+
+    def in_kda(tid, ts: float) -> bool:
+        starts_ = kda_starts.get(tid)
+        if not starts_:
+            return False
+        i = bisect.bisect_right(starts_, ts) - 1
+        return i >= 0 and ts < kda_spans[tid][i][1]
+
+    families: dict[str, list] = defaultdict(lambda: [0, 0.0])
+    names: dict[str, list] = {}
+    stream_durs: dict = defaultdict(list)
     intervals = []  # (start, end, kind 0 compute / 1 comm / 2 copy, group key)
     groups: dict[tuple, list] = defaultdict(lambda: [0, 0.0, 0])  # key -> [kernels, kernel_us, bytes]
     unattributed = 0.0
@@ -145,6 +200,16 @@ def analyze_rank(path_str: str) -> dict:
         if dur <= 0:
             continue
         name = e.get("name", "")
+        family = kernel_family(name, in_kda(e.get("tid"), ts)) if e.get("cat") == "kernel" else "copy"
+        families[family][0] += 1
+        families[family][1] += dur
+        if family != "copy":
+            short = name.split("(")[0][:110]
+            entry = names.setdefault(short, [family, 0, 0.0])
+            entry[1] += 1
+            entry[2] += dur
+        if family not in ("nccl", "copy"):
+            stream_durs[e.get("tid")].append(dur)
         if e.get("cat") == "kernel" and name.startswith("nccl"):
             args = comm_args(e)
             if args:
@@ -203,6 +268,8 @@ def analyze_rank(path_str: str) -> dict:
     window = bounds[-1][0] - bounds[0][0] if bounds else 0.0
     pg_names = sorted({str(op[2].get("Process Group Name")) for ops in comms.values() for op in ops
                        if op[2].get("Process Group Name")})
+    main_stream = max(stream_durs.values(), key=len) if stream_durs else []
+    main_sorted = sorted(main_stream)
     return dict(
         rank=rank,
         window=window,
@@ -210,6 +277,14 @@ def analyze_rank(path_str: str) -> dict:
         unattributed=unattributed,
         groups=[(key, g[0], g[1], g[2], exposed_by.get(key, 0.0)) for key, g in groups.items()],
         pg_names=pg_names,
+        families={f: tuple(v) for f, v in families.items()},
+        top_names=sorted(names.items(), key=lambda kv: -kv[1][2])[:60],
+        stream=(
+            len(main_stream),
+            100 * sum(1 for d in main_stream if d < SMALL_US) / len(main_stream) if main_stream else None,
+            main_sorted[len(main_sorted) // 2] if main_sorted else None,
+        ),
+        pp=(pp_us["F"], pp_us["B"], pp_actions),
     )
 
 
@@ -351,7 +426,30 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
         dict(cell=cell.name, group=name, label=pg_label[name], size=len(m), ranks=",".join(map(str, sorted(m))))
         for name, m in sorted(members.items(), key=lambda kv: (pg_label[kv[0]], sorted(kv[1])))
     ]
-    return row, pg_rows, rank_rows, group_rows
+    kernel_rows = []
+    for r in ranks:
+        fam = r["families"]
+        stream_n, small_pct, median_us = r["stream"]
+        f_us, b_us, actions = r["pp"]
+        kernel_rows.append(dict(
+            cell=cell.name, rank=r["rank"], node=r["rank"] // nproc, window_ms=r["window"] / 1e3,
+            kernels=sum(v[0] for f, v in fam.items() if f != "copy"),
+            **{f"{f}_ms": fam.get(f, (0, 0.0))[1] / 1e3 for f in FAMILIES},
+            stream_kernels=stream_n, small_pct=small_pct, median_us=median_us,
+            pp_f_ms=f_us / 1e3 if actions else None, pp_b_ms=b_us / 1e3 if actions else None, pp_actions=actions,
+        ))
+    merged_names: dict[str, list] = {}
+    for r in ranks:
+        for short, (family, count, us) in r["top_names"]:
+            entry = merged_names.setdefault(short, [family, 0, 0.0])
+            entry[1] += count
+            entry[2] += us
+    topk_rows = [
+        dict(cell=cell.name, family=family, kernel=short, per_rank=round(count / n, 1), ms_per_rank=us / n / 1e3,
+             mean_us=us / count if count else None)
+        for short, (family, count, us) in sorted(merged_names.items(), key=lambda kv: -kv[1][2])[:20]
+    ]
+    return row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows
 
 
 def monitor_stats(stage_dir: Path) -> dict:
@@ -402,7 +500,7 @@ def main() -> int:
         print(f"no traces under {args.stage_dir}/*/tt/profiling/traces")
         return 1
     stats = monitor_stats(args.stage_dir)
-    cell_out, pg_out, rank_out, group_out = [], [], [], []
+    cell_out, pg_out, rank_out, group_out, kernel_out, topk_out = [], [], [], [], [], []
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         for cell in cells:
             files = trace_files(cell)
@@ -413,18 +511,22 @@ def main() -> int:
                 print(f"{cell.name}: unreadable (truncated?) traces of ranks {bad}", file=sys.stderr)
             if not ranks:
                 continue
-            row, pg_rows, rank_rows, group_rows = cell_rows(
+            row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows = cell_rows(
                 cell, ranks, args.nproc, extras(args.stage_dir, cell, args.nproc, stats)
             )
             cell_out.append(row)
             pg_out += pg_rows
             rank_out += rank_rows
             group_out += group_rows
+            kernel_out += kernel_rows
+            topk_out += topk_rows
             print(f"{cell.name}: {len(files)} ranks", file=sys.stderr)
     write_tsv(args.stage_dir / "trace_report.tsv", CELL_COLUMNS, cell_out)
     write_tsv(args.stage_dir / "trace_report_pg.tsv", PG_COLUMNS, pg_out)
     write_tsv(args.stage_dir / "trace_report_rank.tsv", RANK_COLUMNS, rank_out)
     write_tsv(args.stage_dir / "trace_report_groups.tsv", GROUP_COLUMNS, group_out)
+    write_tsv(args.stage_dir / "trace_report_kernels.tsv", KERNEL_COLUMNS, kernel_out)
+    write_tsv(args.stage_dir / "trace_report_topk.tsv", TOPK_COLUMNS, topk_out)
     print((args.stage_dir / "trace_report.tsv").read_text(), end="")
     return 0
 
