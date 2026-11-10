@@ -3,6 +3,7 @@
 2026-11-08 在 Together 的 2 × 8 H100 上实跑过一次，结果和 trace 的读法在 `../results/20261108_h100_together/README.md`。**以后租多节点，默认走第 0 节的快速路径：setup 完成后直接 measure 矩阵的每一行，不做单独的环境测试。** 四个阶段的完整研究（smoke / probe / warm / measure、通信基线、NCCL 调优扫描）在第 4.2 节，需要时再打开。
 
 其他文件只放细节：
+- `PRACTICE_PLAN.md`：模拟文档和真机演练怎么配合，16 / 32 / 64 卡的练习顺序；
 - `together/README.md`：建集群、kubeconfig、IB 排查；
 - `K8S_RUN.md`：运维细节、状态文件、report 各列的定义；
 - `RUNBOOK.md`：不用 k8s、在裸机或 VM 上手动跑的版本；

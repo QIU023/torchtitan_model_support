@@ -118,6 +118,7 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `monitor.py` | 每个节点的 GPU 和 IB 采样器（含温度和降频原因）；`--show` 加 DCGM 看最新一次，`--summary` 按任务汇总 |
 | `dashboard.py` | pod 0 上的实时网页（`k8s.sh dash`）：每步 MFU / tps / 步时间、每个 rank 的最新一步、DCGM、每个节点的日志 |
 | `PLAYBOOK.md` | 完整流程：步骤、每种并行配置的命令、profiler、NCCL / RDMA 验证和调优 |
+| `PRACTICE_PLAN.md` | 模拟文档（5D 规划与通信时间线）和真机演练的配合：先预测、再跑、对表、校准，16 / 32 / 64 卡逐档 |
 | `rdma_bw.sh` | 每个 IB 口的 RDMA 原始带宽（perftest 的 `ib_write_bw`，不经过 NCCL），`run_comm.sh` 先跑它 |
 | `comm_sweep.tsv`、`comm_compare.py` | NCCL 调优变体（每行一个设置）；各变体和 NCCL 默认选择的 α、busbw 对比 |
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
