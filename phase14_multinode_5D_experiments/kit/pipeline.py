@@ -1,12 +1,13 @@
-"""Unattended phase 14 pipeline for two nodes on a shared filesystem; resumes after preemption or restarts.
+"""Unattended phase 14 pipeline for 2, 4 or 8 nodes on a shared filesystem; resumes after preemption or restarts.
 
-bootstrap.sh starts it on both nodes. Tasks run in one order, frozen in $OUT/$HW/pipeline/tasks.json the first
+bootstrap.sh starts it on every node. Tasks run in one order, frozen in $OUT/$HW/pipeline/tasks.json the first
 time node 0 starts: the communication check, the tokenizers, the matrix cells (row by row: smoke, probe, warm,
 measure; MN_ORDER=stage runs every row's smoke first, and so on), then one communication run per NCCL variant of
 comm_sweep.tsv (MN_COMM_SWEEP=0 leaves them out). Node 0 decides attempt numbers, retries, probe
-lengths and skips, and records each decision as a file under $OUT/$HW/pipeline/; node 1 follows those files. A
-finished task is never rerun, so a restarted pod resumes at the first unfinished one. Each node keeps a heartbeat
-with its state; a run whose peer died or moved on is killed and retried without counting as a failure. A probe that
+lengths and skips, and records each decision as a file under $OUT/$HW/pipeline/; the other nodes follow those files.
+A finished task is never rerun, so a restarted pod resumes at the first unfinished one. Each node keeps a heartbeat
+with its state; a run whose peer (any other node) died or moved on is killed and retried without counting as a
+failure. The matrix is matrix_<model>.tsv on 2 nodes and matrix_<model>_n<NNODES>.tsv on 4 or 8. A probe that
 runs out of memory retries at half the length; warm and measure use the length the probe settled on. Probe stores a
 memory snapshot at step 2 (MN_MEMSNAP_PROBE, empty for none); measure writes TensorBoard metrics and a profiler trace;
 at the end node 0 writes the stage summaries, the monitor summary, the NCCL variant comparison and the measure trace
@@ -14,7 +15,7 @@ report.
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
 MN_ROWS (only these matrix rows), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
-PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops both nodes once the current attempt is over.
+PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops every node once the current attempt is over.
 """
 
 import json
@@ -34,7 +35,9 @@ B = Path(ENV["B"])
 OUT = Path(ENV["OUT"])
 HW = ENV["HW"]
 RANK = int(ENV.get("NODE_RANK", "0"))
-PEER = 1 - RANK
+NNODES = int(ENV.get("NNODES", "2"))
+OTHERS = [n for n in range(NNODES) if n != RANK]
+FOLLOWERS = list(range(1, NNODES))
 S = OUT / HW / "pipeline"
 MASTER_PORT = int(ENV.get("MASTER_PORT", "29500"))
 MAX_FAILS = int(ENV.get("MN_MAX_FAILS", "2"))
@@ -101,9 +104,9 @@ def heartbeat() -> None:
         time.sleep(10)
 
 
-def peer() -> tuple[str, float]:
+def peer(node: int) -> tuple[str, float]:
     try:
-        d = json.loads((S / "hb" / f"node{PEER}").read_text())
+        d = json.loads((S / "hb" / f"node{node}").read_text())
         return d["state"], time.time() - d["t"]
     except (OSError, ValueError, KeyError):
         return "missing", 1e9
@@ -130,9 +133,16 @@ def get_rc(tid: str, a: int, node: int):
 # ---------------------------------------------------------------- tasks
 
 
+def matrix_path(model: str) -> Path:
+    return K / (f"matrix_{model}.tsv" if NNODES == 2 else f"matrix_{model}_n{NNODES}.tsv")
+
+
 def matrix_rows(model: str) -> list[dict]:
+    path = matrix_path(model)
+    if not path.exists():
+        raise SystemExit(f"{path.name} does not exist: no {model} matrix for {NNODES} nodes (MN_MODELS)")
     rows = []
-    for line in (K / f"matrix_{model}.tsv").read_text().splitlines():
+    for line in path.read_text().splitlines():
         if not line.strip() or line.startswith("#"):
             continue
         name, cell, s_h100, s_h200, s_a100, extra = (line.split("\t") + [""] * 6)[:6]
@@ -222,7 +232,9 @@ def cell_env(t: dict, seq: int) -> dict:
         )
         return e
     e.update(assets_env(m))
-    e.update(MN_FLAVOR=ENV.get("MN_FLAVOR_OVERRIDE") or ENV[f"FLAVOR_{m}"], MN_SEQ=str(seq))
+    # A row may pick its own flavor; {mem} stands for the hardware's size class (env.sh MEM: 80g or 141g).
+    row_flavor = t["envs"].get("MN_FLAVOR", "").replace("{mem}", ENV.get("MEM", "80g"))
+    e.update(MN_FLAVOR=ENV.get("MN_FLAVOR_OVERRIDE") or row_flavor or ENV[f"FLAVOR_{m}"], MN_SEQ=str(seq))
     if st == "probe":
         e.update(MN_STEPS="3", MN_DATASET="c4_test", MN_CACHE=f"{OUT}/cache/{HW}/probe_{m}")
         e.setdefault("MN_MEMSNAP", ENV.get("MN_MEMSNAP_PROBE", "2"))
@@ -288,22 +300,28 @@ def run_attempt(t: dict, idx: int, a: int, seq: int) -> int:
         return watch(proc, tid, a)
 
 
+def peer_problem(tid: str, a: int, start: float) -> tuple[str | None, float]:
+    """Why this node's run cannot finish (another node left the attempt, aborted it or failed), with its grace."""
+    for n in OTHERS:
+        state, age = peer(n)
+        here = state in (f"run {tid} {a}", f"wait {tid} {a}")
+        starting = state == f"ready {tid}" and time.time() - start < GRACE_START
+        rc = get_rc(tid, a, n)
+        if age >= HB_STALE or not (here or starting):
+            return f"node {n} gone or moved on ({state}, heartbeat {age:.0f}s old)", GRACE_PEER
+        if rc in ABORTED:
+            return f"node {n} aborted this attempt", GRACE_PEER
+        if rc not in (None, 0):
+            return f"node {n}'s run failed", GRACE_FAILED
+    return None, GRACE_PEER
+
+
 def watch(proc: subprocess.Popen, tid: str, a: int) -> int:
-    """Wait for the run; kill it when the peer has left this attempt or its run failed."""
+    """Wait for the run; kill it when another node has left this attempt or its run failed."""
     start, bad_since = time.time(), None
     while proc.poll() is None:
         time.sleep(10)
-        state, age = peer()
-        here = state in (f"run {tid} {a}", f"wait {tid} {a}")
-        starting = state == f"ready {tid}" and time.time() - start < GRACE_START
-        peer_rc = get_rc(tid, a, PEER)
-        reason, grace = None, GRACE_PEER
-        if age >= HB_STALE or not (here or starting):
-            reason = f"peer gone or moved on ({state}, heartbeat {age:.0f}s old)"
-        elif peer_rc in ABORTED:
-            reason = "peer aborted this attempt"
-        elif peer_rc not in (None, 0):
-            reason, grace = "peer's run failed", GRACE_FAILED
+        reason, grace = peer_problem(tid, a, start)
         if reason is None:
             bad_since = None
         elif bad_since is None:
@@ -311,7 +329,7 @@ def watch(proc: subprocess.Popen, tid: str, a: int) -> int:
         elif time.time() - bad_since > grace:
             log(f"{tid} attempt {a}: killing the run, {reason}")
             kill_run(proc)
-            return PEER_FAILED if reason == "peer's run failed" else 97
+            return PEER_FAILED if reason.endswith("run failed") else 97
     return proc.returncode
 
 
@@ -335,18 +353,23 @@ def archive(t: dict, a: int, tag: str) -> None:
         os.replace(src, dst)
 
 
-def wait_peer_rc(tid: str, a: int):
+def wait_followers_rc(tid: str, a: int) -> list[int] | None:
+    """Every follower's exit code of this attempt, or None when one left it without writing one."""
     bad_since = None
     start = time.time()
     while True:
-        rc = get_rc(tid, a, PEER)
-        if rc is not None:
-            return rc
-        state, age = peer()
-        ok = age < HB_STALE and (
-            state in (f"run {tid} {a}", f"wait {tid} {a}")
-            or (state == f"ready {tid}" and time.time() - start < GRACE_START)
-        )
+        rcs = [get_rc(tid, a, n) for n in FOLLOWERS]
+        if all(rc is not None for rc in rcs):
+            return rcs
+        ok = True
+        for n, rc in zip(FOLLOWERS, rcs):
+            if rc is not None:
+                continue
+            state, age = peer(n)
+            ok = ok and age < HB_STALE and (
+                state in (f"run {tid} {a}", f"wait {tid} {a}")
+                or (state == f"ready {tid}" and time.time() - start < GRACE_START)
+            )
         if ok:
             bad_since = None
         elif bad_since is None:
@@ -356,10 +379,10 @@ def wait_peer_rc(tid: str, a: int):
         time.sleep(5)
 
 
-def wait_peer_free(tid: str, last: int) -> bool:
+def wait_followers_free(tid: str, last: int) -> bool:
     while True:
-        state, age = peer()
-        if age < HB_STALE and (state == f"ready {tid}" or state == f"wait {tid} {last}"):
+        states = [peer(n) for n in FOLLOWERS]
+        if all(age < HB_STALE and state in (f"ready {tid}", f"wait {tid} {last}") for state, age in states):
             return True
         if stopped():
             return False
@@ -371,11 +394,13 @@ def stopped() -> bool:
 
 
 def current_seq(t: dict) -> int:
-    """The length a cell runs at: a halved retry, else the probe's length, else MN_SEQ_FORCE, else the matrix's."""
+    """The length a cell runs at: a halved retry, else the probe's, else the row's MN_SEQ, else MN_SEQ_FORCE, else the
+    matrix column's."""
     if t["kind"] != "cell" or t["stage"] == "smoke":
         return 0
     settled = read(mark("len", f"{t['model']}.{t['name']}")) if t["stage"] != "probe" else None
-    return int(read(mark("try", t["id"])) or settled or ENV.get("MN_SEQ_FORCE") or t["seq"])
+    pinned = t["envs"].get("MN_SEQ")
+    return int(read(mark("try", t["id"])) or settled or pinned or ENV.get("MN_SEQ_FORCE") or t["seq"])
 
 
 def blocked(t: dict, ids: set) -> str | None:
@@ -396,7 +421,7 @@ def blocked(t: dict, ids: set) -> str | None:
 
 def lead(t: dict, idx: int, ids: set) -> None:
     tid = t["id"]
-    # An attempt this node announced but never finished was cut off by a restart: mark it aborted for node 1.
+    # An attempt this node announced but never finished was cut off by a restart: mark it aborted for the followers.
     announced = attempts(tid)
     if announced and t["kind"] != "assets" and get_rc(tid, announced[-1], 0) is None:
         write(rc_path(tid, announced[-1], 0), "97")
@@ -433,7 +458,7 @@ def lead(t: dict, idx: int, ids: set) -> None:
             continue
         seq = current_seq(t)
         set_state(f"ready {tid}")
-        if not wait_peer_free(tid, a - 1):
+        if not wait_followers_free(tid, a - 1):
             return
         # A run directory still here belongs to an attempt cut off by a restart (finished attempts are archived).
         if t["kind"] == "cell":
@@ -444,13 +469,14 @@ def lead(t: dict, idx: int, ids: set) -> None:
         rc0 = run_attempt(t, idx, a, seq)
         write(rc_path(tid, a, 0), str(rc0))
         set_state(f"wait {tid} {a}")
-        rc1 = wait_peer_rc(tid, a)
-        if rc1 is None or rc0 in ABORTED or rc1 in ABORTED:
-            log(f"{tid}: attempt {a} aborted (rc {rc0} / {rc1}), not counted")
+        rcs = wait_followers_rc(tid, a)
+        rc_text = " / ".join(map(str, [rc0] + (rcs or ["gone"])))
+        if rcs is None or rc0 in ABORTED or any(rc in ABORTED for rc in rcs):
+            log(f"{tid}: attempt {a} aborted (rc {rc_text}), not counted")
             if t["kind"] == "cell":
                 archive(t, a, "aborted")
             continue
-        if rc0 == 0 and rc1 == 0:
+        if rc0 == 0 and all(rc == 0 for rc in rcs):
             if t["kind"] == "cell" and t["stage"] == "probe":
                 write(mark("len", f"{t['model']}.{t['name']}"), str(seq))
             write(mark("done", tid), "ok")
@@ -468,7 +494,7 @@ def lead(t: dict, idx: int, ids: set) -> None:
         write(mark("fails", tid), str(fails + 1))
         if t["kind"] == "cell":
             archive(t, a, "failed")
-        log(f"{tid}: attempt {a} failed (rc {rc0} / {rc1}), {fails + 1} of {MAX_FAILS}")
+        log(f"{tid}: attempt {a} failed (rc {rc_text}), {fails + 1} of {MAX_FAILS}")
 
 
 def follow(t: dict, idx: int) -> None:
@@ -478,24 +504,24 @@ def follow(t: dict, idx: int) -> None:
     # node arrives at the task was cut off by this node's own restart: it cannot rejoin a run already in progress.
     if t["kind"] != "assets":
         for a in attempts(tid):
-            if get_rc(tid, a, 1) is None:
-                write(rc_path(tid, a, 1), "97" if get_rc(tid, a, 0) is None else "98")
+            if get_rc(tid, a, RANK) is None:
+                write(rc_path(tid, a, RANK), "97" if get_rc(tid, a, 0) is None else "98")
     while not finished(tid):
         if t["kind"] != "assets":
-            pending = [a for a in attempts(tid) if get_rc(tid, a, 1) is None]
+            pending = [a for a in attempts(tid) if get_rc(tid, a, RANK) is None]
             if pending:
                 a = pending[-1]
                 for old in pending[:-1]:
-                    write(rc_path(tid, old, 1), "98")
+                    write(rc_path(tid, old, RANK), "98")
                 if get_rc(tid, a, 0) is not None:
-                    write(rc_path(tid, a, 1), "98")
+                    write(rc_path(tid, a, RANK), "98")
                     set_state(f"wait {tid} {a}")
                     continue
                 seq = int(json.loads(read(mark("go", f"{tid}.a{a}")) or "{}").get("seq", 0))
                 set_state(f"run {tid} {a}")
                 log(f"{tid}: attempt {a} starts")
                 rc = run_attempt(t, idx, a, seq)
-                write(rc_path(tid, a, 1), str(rc))
+                write(rc_path(tid, a, RANK), str(rc))
                 set_state(f"wait {tid} {a}")
                 log(f"{tid}: attempt {a} rc {rc}")
                 continue
@@ -534,8 +560,8 @@ def finish(tasks: list[dict]) -> None:
 
 
 def main() -> int:
-    if int(ENV.get("NNODES", "2")) != 2:
-        print("pipeline.py drives exactly two nodes", file=sys.stderr)
+    if NNODES not in (2, 4, 8):
+        print(f"pipeline.py drives 2, 4 or 8 nodes, got NNODES={NNODES}", file=sys.stderr)
         return 2
     S.mkdir(parents=True, exist_ok=True)
     threading.Thread(target=heartbeat, daemon=True).start()
@@ -567,7 +593,7 @@ def print_cell_env(model: str, stage: str, row: str) -> int:
     """Shell exports of one cell's settings, as the pipeline would run it (k8s.sh cell runs a cell by hand)."""
     rows = [r for r in matrix_rows(model) if r["name"] == row]
     if not rows or stage not in ("smoke", "probe", "warm", "measure"):
-        print(f"echo 'no row {row} in matrix_{model}.tsv, or stage {stage} unknown' >&2; false")
+        print(f"echo 'no row {row} in {matrix_path(model).name}, or stage {stage} unknown' >&2; false")
         return 1
     t = dict(id=f"{model}.{stage}.{row}", kind="cell", model=model, stage=stage, **rows[0])
     seq = current_seq(t)

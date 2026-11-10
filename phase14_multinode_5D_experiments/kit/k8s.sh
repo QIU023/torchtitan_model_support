@@ -1,6 +1,8 @@
 #!/bin/bash
-# Watch and steer the two phase 14 pods (nebius/p14_pods.yaml or together/p14_pods.yaml) from your own machine;
-# kubectl must point at the cluster. The pods run the pipeline by themselves (bootstrap.sh, pipeline.py).
+# Watch and steer the phase 14 pods, one per node, 2, 4 or 8 of them (nebius/p14_pods.yaml or together/p14_pods.yaml)
+# from your own machine; kubectl must point at the cluster. The pods run the pipeline by themselves (bootstrap.sh,
+# pipeline.py).
+#   k8s.sh apply <2|4|8> [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes
 #   k8s.sh status              pods, setup, both heartbeats, the last pipeline decisions, REPORT.txt once finished
 #   k8s.sh logs [n]            last n (30) pipeline log lines of both nodes
 #   k8s.sh shell <0|1>         interactive shell in pod 0 or 1
@@ -23,7 +25,7 @@
 #   k8s.sh watch [seconds]     top again every 5 (or the given) seconds until ctrl-c
 #   k8s.sh dash                live dashboard on pod 0, forwarded to http://localhost:8765: MFU and tps per step,
 #                              every rank's latest step, every GPU from DCGM, the comm verdict, the cell's profiler files
-#   k8s.sh tail [0|1] [steps]  follow the newest cell's training log of node 0 (ranks 0-7) or node 1 (ranks 8-15);
+#   k8s.sh tail [node] [steps] follow the newest cell's training log of a node (node n holds ranks 8n to 8n+7);
 #                              with steps, only the step lines (loss, memory, tps, tflops, mfu)
 #   k8s.sh report [stage]      per cell of a stage (measure): step time, tps, MFU, peak memory, compute / exposed
 #                              communication by process group / idle from the traces, InfiniBand rates
@@ -33,7 +35,7 @@
 #   k8s.sh cell <stage> <row> [VAR=value ...]   one cell by hand on both pods, with the pipeline's settings for that
 #                              stage and row (plus overrides such as MN_SEQ=16384), into runs/<hw>/manual/<stage>/;
 #                              waits for it, printing the newest step, then prints its summary (stop the pipeline first)
-#   k8s.sh both '<command>'    one command in both pods at once, detached (manual work; stop the pipeline first)
+#   k8s.sh both '<command>'    one command in every pod at once, detached (manual work; stop the pipeline first)
 # Environment: NS (default), JOB (p14), BASE (/mnt/shared/p14, MN_BASE in the manifest), PYTHON (python3).
 set -euo pipefail
 # Git Bash on Windows rewrites /mnt/... arguments of native programs such as kubectl.exe into Windows paths.
@@ -50,7 +52,10 @@ JOB=${JOB:-p14}
 BASE=${BASE:-/mnt/shared/p14}
 PHASE=$BASE/logbook/phase14_multinode_5D_experiments
 KIT=$PHASE/kit
-RUNS=$BASE/runs
+# The Job's completions are the node count; 4 and 8 nodes keep their runs apart from the 2-node ones (env.sh OUT).
+NN=$(kubectl get job "$JOB" -n "$NS" -o jsonpath='{.spec.completions}' 2>/dev/null || true)
+NN=${NN:-2}
+RUNS=$BASE/runs$([ "$NN" = 2 ] || echo "_n$NN")
 PY=$BASE/venv/bin/python
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -97,6 +102,13 @@ killall_runs() {
 }
 
 case "${1:-status}" in
+  apply)
+    n=${2:?node count: 2, 4 or 8}
+    case $n in 2|4|8) ;; *) echo "node count must be 2, 4 or 8" >&2; exit 1 ;; esac
+    manifest=${3:-$HERE/kit/together/p14_pods.yaml}
+    sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" "$manifest" |
+      kubectl apply -f -
+    echo "applied $manifest for $n nodes ($((n * 8)) GPUs); runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
   status)
     kubectl get pods -n "$NS" -l "job-name=$JOB" -o wide
     on "$(any)" "
@@ -105,13 +117,13 @@ case "${1:-status}" in
       for s in $RUNS/*/pipeline; do
         [ -d \$s ] || continue
         echo \"== \$s: \$(ls \$s/done 2>/dev/null | wc -l) done, \$(ls \$s/giveup 2>/dev/null | wc -l) given up\"
-        for n in 0 1; do echo \"node\$n: \$(cat \$s/hb/node\$n 2>/dev/null)\"; done
+        for h in \$s/hb/node*; do [ -f \$h ] && echo \"\$(basename \$h): \$(cat \$h)\"; done
         tail -n 6 \$s/log_node0.txt 2>/dev/null
         cat \$s/../comm/verdict_node0.txt 2>/dev/null | head -n 3
         [ -f \$s/REPORT.txt ] && cat \$s/REPORT.txt
       done; true" ;;
   logs)
-    on "$(any)" "for s in $RUNS/*/pipeline; do for n in 0 1; do echo \"== \$s node\$n\"; tail -n ${2:-30} \$s/log_node\$n.txt 2>/dev/null; done; done; true" ;;
+    on "$(any)" "for s in $RUNS/*/pipeline; do for f in \$s/log_node*.txt; do [ -f \$f ] && echo \"== \$f\" && tail -n ${2:-30} \$f; done; done; true" ;;
   shell)
     kubectl exec -it -n "$NS" "$(pod "${2:?pod index 0 or 1}")" -- bash ;;
   stop)
@@ -245,27 +257,27 @@ case "${1:-status}" in
     port=$((29700 + RANDOM % 200))
     cmd="d=$d
 { [ ! -f $BASE/scope.env ] || . $BASE/scope.env; . $KIT/env.sh
-  export B OUT HW GATE FLAVOR_k3 FLAVOR_m3 ASSETS_k3 ASSETS_m3
+  export B OUT HW GATE MEM NNODES NPROC FLAVOR_k3 FLAVOR_m3 ASSETS_k3 ASSETS_m3
   eval \"\$($PY $KIT/pipeline.py --cell-env ${row%%_*} $stage $row)\" && export MN_PORT=$port $* && bash $KIT/launch.sh \$d; } ||
 { mkdir -p \$d; [ -f \$d/rc_node\$NODE_RANK ] || echo 99 > \$d/rc_node\$NODE_RANK; }"
     detached "cell_${stage}_$name" "$cmd"
     echo "$stage $row on both pods, in $d; ctrl-c stops watching, not the run (k8s.sh kill stops it)"
     failed_since=
-    until [ "$(on "$(any)" "[ -f $d/rc_node0 ] && [ -f $d/rc_node1 ] && echo done; true")" = done ]; do
+    until [ "$(on "$(any)" "for k in \$(seq 0 $((NN - 1))); do [ -f $d/rc_node\$k ] || exit 0; done; echo done")" = done ]; do
       sleep 20
       on "$(any)" "grep -h 'step:' $d/node*.log 2>/dev/null | tail -n 1 | sed 's/\x1b\[[0-9;]*m//g'; true"
       # A node that failed leaves the other one waiting in NCCL until its timeout: stop it after a minute.
-      bad=$(on "$(any)" "for k in 0 1; do [ -f $d/rc_node\$k ] && [ \"\$(cat $d/rc_node\$k)\" != 0 ] && echo \$k; done; true")
+      bad=$(on "$(any)" "for k in \$(seq 0 $((NN - 1))); do [ -f $d/rc_node\$k ] && [ \"\$(cat $d/rc_node\$k)\" != 0 ] && echo \$k; done; true" | head -n 1)
       if [ -n "$bad" ]; then
         [ -n "$failed_since" ] || failed_since=$SECONDS
         if [ $((SECONDS - failed_since)) -ge 60 ]; then
-          echo "node $bad failed; stopping the other node's run, which waits for it"
+          echo "node $bad failed; stopping the other nodes' runs, which wait for it"
           for p in $(pods); do on "$p" "pkill -f 'torchtita[n].train'; true"; done
           on "$(any)" "grep -h -m1 -E 'OutOfMemoryError|Error:' $d/node$bad.log | cut -c1-300; true"
         fi
       fi
     done
-    on "$(any)" "echo \"rc: \$(cat $d/rc_node0) \$(cat $d/rc_node1)\"; grep -h 'multinode_5d\]' $d/node0.log | head -n 1
+    on "$(any)" "echo \"rc: \$(cat $d/rc_node* | tr '\\n' ' ')\"; grep -h 'multinode_5d\]' $d/node0.log | head -n 1
       $PY $KIT/summarize.py \$(dirname $d) | grep -E '^cell|^$name'; true" ;;
   both)
     detached "both_$(date +%H%M%S)" "${2:?command}" ;;

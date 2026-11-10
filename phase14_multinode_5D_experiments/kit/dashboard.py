@@ -104,14 +104,14 @@ td,th{border:1px solid #ddd;padding:2px 6px;text-align:right;font-variant-numeri
 th{background:#f0f0f0}.bar{display:inline-block;height:8px;background:#4a7bd0;vertical-align:middle}
 pre{background:#fff;border:1px solid #ddd;padding:6px;max-height:220px;overflow:auto}
 canvas{background:#fff;border:1px solid #ddd}.muted{color:#777}
-.logs{display:flex;gap:8px}.logs>div{flex:1;min-width:0}
+.logs{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:8px}.logs>div{min-width:0}
 .logs pre{height:420px;max-height:none;font:11px ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;margin:0}
 .err{color:#c00;font-weight:600}.step{color:#06c}
 </style></head><body>
 <div id="head"></div>
-<h2>Training logs of the newest cell, both nodes (newest at the bottom)
+<h2>Training logs of the newest cell, every node (newest at the bottom)
  <select id="lf"><option value="nowarn">hide warnings</option><option value="all">all lines</option><option value="steps">steps and errors</option></select></h2>
-<div class="logs"><div><b>node 0 (ranks 0-7)</b><pre id="log0"></pre></div><div><b>node 1 (ranks 8-15)</b><pre id="log1"></pre></div></div>
+<div class="logs" id="logs"></div>
 <h2>MFU and tps per step (mean over ranks; band = min..max MFU)</h2>
 <canvas id="mfu" width="900" height="220"></canvas><br><canvas id="tps" width="900" height="160"></canvas>
 <br><canvas id="secs" width="900" height="160"></canvas>
@@ -152,7 +152,7 @@ async function tick(){
        "</td><td>"+f(m.dram,2)+"</td><td>"+f(m.mem_gib,1)+"</td><td>"+f(m.power_w,0)+"</td><td>"+f(m.nvl_tx,1)+" / "+f(m.nvl_rx,1)+"</td><td>"+f(m.pcie_tx,1)+" / "+f(m.pcie_rx,1)+"</td></tr>";
   document.getElementById("gpus").innerHTML=Object.keys(d.gpus||{}).length?h+"</table><span class=muted>PCIe carries the inter-node traffic under GPUDirect RDMA.</span>":"no DCGM data (start with --dcgm)";
   const t=(d.traces||[]).length,s=(d.snapshots||[]).length;
-  document.getElementById("prof").innerHTML=(t?t+" trace files (measure, step 25): k8s.sh trace &lt;stage&gt; &lt;row&gt; merges them for ui.perfetto.dev<br>":"no profiler trace in this cell (measure writes one at step 25)<br>")+
+  document.getElementById("prof").innerHTML=(t?t+" trace files (measure's profiled step): k8s.sh trace &lt;stage&gt; &lt;row&gt; merges them for ui.perfetto.dev<br>":"no profiler trace in this cell (measure writes one at its profiled step)<br>")+
     (s?s+" memory snapshots: k8s.sh fetch the cell's tt/profiling/memory_snapshot for pytorch.org/memory_viz":"no memory snapshot (probe writes one at step 2)");
   document.getElementById("comm").textContent=d.comm||"";
   showLogs(d.logs||{});
@@ -161,7 +161,11 @@ const ERR=/Traceback|Error|error:|OutOfMemory|out of memory|Timeout|timed out|Wa
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 function showLogs(logs){
   const mode=document.getElementById("lf").value;
-  for(const n of [0,1]){
+  const box=document.getElementById("logs");
+  const nodes=Object.keys(logs).map(k=>+k.slice(4)).sort((a,b)=>a-b);
+  for(const n of nodes.length?nodes:[0]){
+    if(!document.getElementById("log"+n)){const div=document.createElement("div");
+      div.innerHTML="<b>node "+n+" (ranks "+8*n+"-"+(8*n+7)+")</b><pre id=log"+n+"></pre>";box.appendChild(div)}
     let lines=logs["node"+n]||[];
     if(mode==="nowarn"){const keep=[];let skipNext=false;
       for(const l of lines){if(skipNext){skipNext=false;continue}

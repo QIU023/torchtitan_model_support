@@ -30,7 +30,7 @@ while [ ! -f $B/SETUP_OK ]; do
   fi
 done
 echo "$(date +%T) $(hostname): shared setup ready"
-export B OUT HW GATE FLAVOR_k3 FLAVOR_m3 ASSETS_k3 ASSETS_m3 MASTER_PORT NNODES NPROC NODE_RANK MASTER_ADDR K T V
+export B OUT HW GATE MEM FLAVOR_k3 FLAVOR_m3 ASSETS_k3 ASSETS_m3 MASTER_PORT NNODES NPROC NODE_RANK MASTER_ADDR K T V
 # One GPU and InfiniBand sampler per container (monitor.py); it keeps running across pipeline restarts.
 if [ "${MN_MONITOR:-1}" = 1 ] && ! pgrep -f 'kit/monito[r].py' > /dev/null; then
   setsid nohup $V/bin/python $KIT/monitor.py >> $B/monitor_$(hostname).log 2>&1 < /dev/null &

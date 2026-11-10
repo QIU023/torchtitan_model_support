@@ -11,7 +11,7 @@ export MN_SEQ_FORCE=16384 MN_COMPILE=0 MN_VPP=2 MEAS_STEPS=5 PROFILE_FREQ=5
 bash $KIT/run_matrix.sh k3 measure
 ```
 
-`run_matrix.sh` 不会在 OOM 后自动减半：OOM 的行用 `MN_SEQ_FORCE=8192 bash $KIT/run_matrix.sh k3 measure <行名>` 重跑。网络看每格 `nccl/` 下的 NCCL INFO 日志，`summarize.py` 的 `net` 列给出结论。
+4 台或 8 台：每台另外 `export NNODES=4`（或 8），`run_matrix.sh` 会用 `matrix_k3_n4.tsv` / `matrix_k3_n8.tsv`，输出在 `~/p14/runs_n4/`（`runs_n8/`）；没有共享文件系统时，`collect.sh` 只会拉 node 1 的结果，其他节点要各自拉。`run_matrix.sh` 不会在 OOM 后自动减半：OOM 的行用 `MN_SEQ_FORCE=8192 bash $KIT/run_matrix.sh k3 measure <行名>` 重跑。网络看每格 `nccl/` 下的 NCCL INFO 日志，`summarize.py` 的 `net` 列给出结论。
 
 ## 0. 先确定租什么
 

@@ -1,10 +1,10 @@
-# Phase 14 on a Together GPU cluster (Kubernetes): two pods, one per 8-GPU node, both mounting the cluster's shared
-# volume (together/README.md). kubectl apply -f p14_pods.yaml
+# Phase 14 on a Together GPU cluster (Kubernetes): one pod per 8-GPU node, 2, 4 or 8 of them, all mounting the
+# cluster's shared volume (together/README.md). Apply with kit/k8s.sh apply <2|4|8>, which sets the node count below.
 # Before applying: set volumeName to your shared volume's name (kubectl get pv; Together creates a static PV with the
 # same name as the shared volume), HW (h100 / h200 / b200) and the MN_* settings.
 # Each pod clones the kit onto the shared volume once, then runs kit/bootstrap.sh: packages, the shared setup, and
 # the unattended pipeline, which resumes where it stopped after a preemption (state on the shared volume). The
-# Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
+# Indexed Job gives the pods JOB_COMPLETION_INDEX (the node rank) and hostnames p14-0, p14-1, ...; the headless
 # Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). The GPU nodes offer the network operator's rdma/infiniband
 # resource; the pod takes one and is privileged so NCCL reaches the HCAs; every run records which transport NCCL took.
 apiVersion: v1
@@ -72,6 +72,9 @@ spec:
         env:
         - name: HW
           value: h100
+        # Node count, with completions and parallelism above: k8s.sh apply <2|4|8> sets all three.
+        - name: NNODES
+          value: "2"
         - name: MN_NET
           value: together
         - name: MN_BASE

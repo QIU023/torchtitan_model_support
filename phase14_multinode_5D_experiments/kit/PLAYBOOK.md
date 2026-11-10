@@ -21,7 +21,7 @@ PK=/mnt/shared/p14/logbook/phase14_multinode_5D_experiments/kit    # pod 里 kit
 | 步骤 | 在哪 | 做什么 | 11-08 实际用时 |
 |---|---|---|---|
 | 1 | 本机 | 充值，装 `tg` 和 `kubectl`，清单里填 `volumeName` 和 `HW` | 10 分钟 |
-| 2 | Together 控制台 | 建集群：2 个节点、Kubernetes、共享卷 | 等资源 |
+| 2 | Together 控制台 | 建集群：2 个节点（32 / 64 卡见第 0.1 节）、Kubernetes、共享卷 | 等资源 |
 | 3 | 本机 | `get-credentials`，`kubectl apply` | 5 分钟 |
 | 4 | pod 里自动 | 容器包、共享 setup、tokenizer | 约 15 分钟 |
 | 5 | pod 里自动 | K3 矩阵 9 行，每行 measure 一次：5 步，第 5 步出所有 rank 的 trace；OOM 的行长度减半重跑 | 每行 3 到 7 分钟，9 行约 50 分钟 |
@@ -50,10 +50,10 @@ NCCL 超时清单不设，用 titan 的默认：初始化和第 1 步 300 秒，
 tg clusters list
 tg clusters get-credentials <CLUSTER_ID> --set-default-context --no-json
 kubectl get pv
-kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
+bash $K8S apply 2         # 节点数：2、4 或 8
 
 # 跑的时候
-bash $K8S status          # setup、两个节点的心跳、流水线最近的决定；跑完后打印 REPORT.txt
+bash $K8S status          # setup、每个节点的心跳、流水线最近的决定；跑完后打印 REPORT.txt
 bash $K8S dash            # 浏览器开 http://localhost:8765（第 4.3 节）
 bash $K8S watch 5         # 终端版：16 张卡的 DCGM 和正在跑的那一格的最新一步
 
@@ -64,6 +64,33 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
 ```
 
 拉回本机以后的分析（第 6.2 节）不需要集群，确认 `raw/` 完整以后就可以删集群。
+
+### 0.1 32 卡和 64 卡（4 个或 8 个节点）
+
+- **拉起：** 建集群时选 4 或 8 个节点，用 `bash $K8S apply 4` 或 `apply 8` 拉起。它把清单里的 `completions`、`parallelism` 和 `NNODES` 一起改掉。其余步骤和清单的快速路径设置都不变。
+- **矩阵和输出：** 4、8 节点各有自己的一份：
+  - 矩阵是 `matrix_k3_n4.tsv`、`matrix_k3_n8.tsv`。只有 K3，M3 只在 2 节点上跑；
+  - 输出在共享卷的 `runs_n4/`、`runs_n8/`，和 2 节点的 `runs/` 分开，同一个卷上可以先后跑不同的节点数；
+  - `k8s.sh` 按当前 Job 的节点数自动找对目录，`fetch`、`report`、`trace` 的用法和 2 节点一样。
+- **前提不变：** 每步 524,288 token，dp 2（或 1）。多出来的卡给跨节点的 PP 和更大的模型，TP、CP、EP 默认留在节点内（第 5.1 节）。
+- **模型：** 下表是 titan 分支 `c8c229b59` 加的 flavor，宽度和 16 卡的相同，每卡的参数量大致不变。H200 / B200 用对应的 `141g` 版本。
+
+| flavor | 层数 | 专家 | AttnRes block | 总参数（估） | 用在 |
+|---|---|---|---|---|---|
+| `k3_16x80g` | 29 | 128 | 4 | 14.5B | 2 节点；32、64 卡的 `_ref` 行（同一个模型，更多卡） |
+| `k3_32x80g` | 61 | 128 | 8 | 约 30B | 4 节点的默认 |
+| `k3_32x80g_e256` | 29 | 256 | 4 | 约 26B | 4 节点的 EP 对照 |
+| `k3_64x80g` | 93 | 128 | 12 | 约 46B | 8 节点的默认：K3 的真实层数和注意力排布（每 4 层一个 MLA，加最后一层） |
+| `k3_64x80g_e512` | 29 | 512 | 4 | 约 50B | 8 节点的 EP 对照 |
+
+总参数是按 16 卡版本的参数分布推算的，没在机器上数过。
+
+- **时间和费用**（纸面估计）：
+  - 每行 5 到 10 分钟；16K 放不下的行会自动减半重跑，每次多几分钟；
+  - 4 节点 10 行、8 节点 9 行，各约 1 到 1.5 小时；
+  - 32 卡每小时约 $64，64 卡约 $128；
+  - 余额门槛按卡数涨：抢占式目标 4 小时，32 卡约 $256，64 卡约 $511。
+- **还没在真集群上跑过：** N 个节点的协同只在本机模拟过。8 节点下，正常完成、OOM 减半、杀 follower、杀 leader、STOP 都通过了。
 
 ## 1. 开始前（本机）
 
@@ -76,17 +103,17 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
    - `volumeName`：共享卷对应的 PV 名，第 3 步查；
    - `HW`：`h100`、`h200` 或 `b200`。控制台标价 $1.995/GPU·时的是 H100 抢占式。写错卡型会按另一种卡的缩小版和长度跑。
 
-kit 只支持 2 个节点，不要建 32 卡。
+kit 支持 2、4、8 个节点（16、32、64 卡），4 和 8 节点见第 0.1 节。
 
 ## 2. 建集群（Together 控制台）
 
-- 抢占式 16 卡，也就是 2 个节点；编排选 Kubernetes。驱动用默认的（11-08 是 610 / CUDA 13.3）。
+- 抢占式 16、32 或 64 卡，也就是 2、4 或 8 个节点；编排选 Kubernetes。驱动用默认的（11-08 是 610 / CUDA 13.3）。
 - 如果控制台要求至少一个按需（standard）节点，就建 1 个按需节点加 1 个抢占式节点，两个 pod 一边一个，清单里的 `nodeSelector` 保持注释。
 - 共享卷 500 GiB 左右，跟集群一起建，记下卷名。卷能扩不能缩。
 
 细节和依据见 `together/README.md` 第 0、1 节。
 
-## 3. 拉起两个 pod
+## 3. 拉起 pod（每个节点一个）
 
 ```sh
 tg clusters list
@@ -94,7 +121,7 @@ tg clusters get-credentials <CLUSTER_ID> --set-default-context --no-json
 kubectl get nodes -L together.ai/compute-class
 kubectl get pv                                          # 共享卷同名的那个 PV，填进清单的 volumeName
 kubectl create secret generic hf-token --from-literal=token=<hf_token>   # 可选
-kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
+bash $K8S apply 2                                       # 节点数：2、4 或 8
 bash $K8S status
 ```
 
@@ -140,7 +167,7 @@ bash $K8S status
   - 正在跑的那一格每步的 MFU、tps 和步时间；
   - 16 个 rank 各自的最新一步；非最后一个 PP stage 的 rank 没有 loss，显示 "no loss stage"；
   - 每张卡的 DCGM：SM 活跃度、Tensor Core 活跃度、显存、功耗、NVLink 和 PCIe 速率；
-  - 两个节点的训练日志（可以只看步数行或报错），通信结论，这一格的 profiler 文件。
+  - 每个节点的训练日志（可以只看步数行或报错），通信结论，这一格的 profiler 文件。
 - **`bash $K8S tail 0|1 [steps]`**：在写日志的那个 pod 里跟踪 node 0 或 node 1 的日志。不要从另一个 pod 读共享卷上的日志，NFS 的缓存会让它停在旧的长度。
 - **显存不均匀是正常的**：1F1B 下第一个 PP stage 存的激活最多，11-08 的 `k3_A` 是 node 0 62 GiB，node 1 52 GiB。
 - **先看有没有过热降频的卡：**
@@ -186,6 +213,34 @@ K3（`matrix_k3.tsv`）：
 | `k3_B_keep` | 1·2·4·2·8，整步不 reshard | 32K 全部 | FSDP | 和下一行一起，在同一长度、同一 FSDP 模式下比 EP 放置 | 同上 |
 | `k3_B_ep16_keep` | 1·2·4·2·16，整步不 reshard | 32K 全部 | EP | 同上 | 同上 |
 
+32 卡（`matrix_k3_n4.tsv`，默认 `k3_32x80g`，61 层）：
+
+| 行 | 度数 pp·dp·cp·tp·ep | 模型 | 跨节点的是 | 用来回答 |
+|---|---|---|---|---|
+| `k3_A4_ref`、`k3_A4_ref_v4` | 4·2·1·4·8 | `k3_16x80g`，VPP 2 / 4 | PP | 同一个模型从 pp 2 到 pp 4 的代价，和 11-08 的 `k3_A` 比 |
+| `k3_A4`、`k3_A4_v4` | 4·2·1·4·8 | 61 层，VPP 2 / 4 | PP | 更深的模型，PP 跨 4 个节点 |
+| `k3_5d4` | 4·2·2·2·8 | 61 层 | PP | 5D 全开 |
+| `k3_C4` | 4·2·4·1·8 | 61 层 | PP | 不用 TP，CP 4 |
+| `k3_D4` | 4·1·4·2·8 | 61 层 | PP | 没有 FSDP，32 个 micro-batch |
+| `k3_E4_ep8`、`k3_E4_ep16` | 2·2·2·4·8 / 16 | 256 个专家 | PP；`_ep16` 的 EP 跨两个节点 | EP 留在节点内，对 EP 跨节点 |
+| `k3_L4` | 1·2·4·4·8，64K | 61 层 | CP（CP 4 × TP 4 跨两个节点）、FSDP | 长上下文下 CP 跨节点 |
+
+64 卡（`matrix_k3_n8.tsv`，默认 `k3_64x80g`，93 层）：
+
+| 行 | 度数 pp·dp·cp·tp·ep | 模型 | 跨节点的是 | 用来回答 |
+|---|---|---|---|---|
+| `k3_A8_ref` | 8·2·1·4·8 | `k3_16x80g`，VPP 2 | PP | 同一个模型到 pp 8（29 层最多 VPP 2） |
+| `k3_A8`、`k3_A8_v2` | 8·2·1·4·8 | 93 层，VPP 4 / 2 | PP | K3 的 32 个虚拟 stage（每个 3 层）；VPP 4 对 VPP 2 |
+| `k3_5d8` | 8·2·2·2·8 | 93 层，VPP 4 | PP | 5D 全开 |
+| `k3_C8` | 8·2·4·1·8 | 93 层，VPP 4 | PP | 不用 TP，CP 4 |
+| `k3_D8` | 8·1·4·2·8 | 93 层，VPP 4 | PP | 没有 FSDP |
+| `k3_E8_ep8`、`k3_E8_ep16` | 4·2·2·4·8 / 16 | 512 个专家 | PP；`_ep16` 的 EP 跨两个节点 | EP 留在节点内，对 EP 跨节点 |
+| `k3_L8` | 1·2·8·4·8，128K | 93 层 | CP（CP 8 × TP 4 跨四个节点）、FSDP | 长上下文下 CP 跨节点 |
+
+32 / 64 卡的两点提醒：
+- **气泡：** 16K 时每个 dp rank 有 16 个 micro-batch，Interleaved 1F1B 的气泡约为 (pp−1)/(v·m)：pp4·v2 9%，pp4·v4 5%，pp8·v2 22%，pp8·v4 11%。长度减半时 micro-batch 翻倍，气泡减半。
+- **显存：** 1F1B 下第一个 stage 存的激活和总层数成正比，与 pp 无关。61 层、93 层在 16K 大概率放不下，会自动减半重跑。
+
 M3（`matrix_m3.tsv`，没有 CP，TP 最多 4）：
 
 | 行 | 度数（dpr·pp·dp·tp·ep） | 长度 | 跨节点的是 | 用来回答 |
@@ -221,6 +276,8 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_SEQ_FORCE=<n>`（清单或 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；没有 probe 的时候，warm 和 measure 自己在 OOM 后减半重试；
 - `MN_COMPILE=0`：K3 的局部编译区改成 eager，flex attention 不做 autotune（flex 不能完全不编译，长序列 eager 会 OOM）；省编译时间，但 kernel 没调优，MFU 偏低；
 - 任何 `NCCL_*` 变量（第 7.4 节）；
+- `MN_FLAVOR=k3_<卡数>x{mem}[_e<专家数>]`：这一行换一个 flavor，`{mem}` 按卡型换成 `80g` 或 `141g`；
+- `MN_SEQ=<n>`：固定这一行的长度，`MN_SEQ_FORCE` 不覆盖它（长上下文的行用）；
 - `h200:VAR=值`：只在这种卡上生效；
 - `nosmoke`：跳过 smoke。
 
@@ -232,7 +289,7 @@ k3_5d_vpp	pp=2,dp=2,cp=2,tp=2,ep=8	32768	16384	24576	MN_SCHEDULE=Interleaved1F1B
 
 要重跑一个已完成的任务，先删掉共享卷上 `runs/<hw>/pipeline/done/<任务名>`，再 `retask`。
 
-**按行手动逐格跑**（流水线先 `stop` 或 `kill`）：`bash $K8S cell <阶段> <行名> [VAR=值 ...]` 用流水线对这一行这一阶段的同一套设置（tokenizer、长度、NCCL 网卡、显存快照、trace），在两个 pod 上同时跑一格，跑完打印退出码和这一格的 `summary`，期间每 20 秒打印最新一步。结果写在 `runs/<hw>/manual/<阶段>/<行名>_<时间>/`，measure 的拆分用 `bash $K8S report manual/measure`。手动跑时 probe 不会自动减半：OOM 了就加 `MN_SEQ=<一半>` 重跑，warm 和 measure 也带上同样的 `MN_SEQ`。
+**按行手动逐格跑**（流水线先 `stop` 或 `kill`）：`bash $K8S cell <阶段> <行名> [VAR=值 ...]` 用流水线对这一行这一阶段的同一套设置（tokenizer、长度、NCCL 网卡、显存快照、trace），在所有 pod 上同时跑一格，跑完打印退出码和这一格的 `summary`，期间每 20 秒打印最新一步。结果写在 `runs/<hw>/manual/<阶段>/<行名>_<时间>/`，measure 的拆分用 `bash $K8S report manual/measure`。手动跑时 probe 不会自动减半：OOM 了就加 `MN_SEQ=<一半>` 重跑，warm 和 measure 也带上同样的 `MN_SEQ`。
 
 ```sh
 bash $K8S cell smoke k3_5d
@@ -242,7 +299,7 @@ bash $K8S cell measure k3_5d
 bash $K8S cell probe k3_B MN_SEQ=32768     # 例：长度减半重跑
 ```
 
-**任意度数手动跑一格**（不进矩阵）：先 `bash $K8S stop`，等当前这次尝试结束，再让两个 pod 同时执行：
+**任意度数手动跑一格**（不进矩阵）：先 `bash $K8S stop`，等当前这次尝试结束，再让所有 pod 同时执行：
 
 ```sh
 bash $K8S both "MN_MODEL=k3 MN_FLAVOR=k3_16x141g MN_ASSETS=/mnt/shared/p14/assets/kimi_k3_tokenizer \
@@ -427,11 +484,11 @@ Together 的集群不能暂停，停止计费只能删集群。共享卷默认�
 | `InfiniBand: NO` 或 RDMA 原始带宽 failed | `bash $K8S comm`、`setup_node_*.log` 里的 `ib devices` | `together/README.md` 第 4 节 |
 | 某格 OOM | `REPORT.txt`、probe 的 `summary.tsv` | probe 会自动减半；被放弃的行在矩阵里缩短后再 `retask` |
 | 某格卡住或超时 | `bash $K8S logs`，以及那格的 `node*.log` 和 `tt/comm_traces/` | 看门狗会杀掉对方已经离开的运行；flight recorder 的 dump 里有卡在哪个 collective |
-| 节点被抢占 | `bash $K8S status` 里两个节点的心跳 | 自动续跑；节点一直不回来就在控制台看容量 |
+| 节点被抢占 | `bash $K8S status` 里每个节点的心跳 | 自动续跑；节点一直不回来就在控制台看容量 |
 | report 的 `unattributed_pct` 不是 0 | `trace_report_pg.tsv` 里 `?` 那一行 | 用 `trace` 拉一格看 NCCL kernel 的参数，修 `trace_report.py` |
 | 余额快用完 | Together 控制台 | 先 `collect`；余额用完时集群会被立刻暂停 |
 | setup 一开始就退出，日志最后是 `CUDA_DRV=` | `setup_*.log` | 610 驱动的 `nvidia-smi` 写的是 `CUDA UMD Version`，`setup.sh` 已经两种都认；换了驱动又出现时看 `nvidia-smi` 的表头 |
-| 一个节点 OOM 退出，另一个节点不动 | 两个节点的 `node*.log` | 另一个节点卡在 NCCL 里，要等初始化超时（300 秒）；流水线的看门狗和 `k8s.sh cell` 会在 60 秒后杀掉它 |
+| 一个节点 OOM 退出，其他节点不动 | 每个节点的 `node*.log` | 其他节点卡在 NCCL 里，要等初始化超时（300 秒）；流水线的看门狗和 `k8s.sh cell` 会在 60 秒后杀掉它 |
 | `tail` 看不到新日志 | 日志在哪个 pod 写 | 用 `bash $K8S tail 0` / `tail 1` 或 dashboard，它们在写日志的那个 pod 里读 |
 | 某格比同类慢很多，或者 rank 之间 `compute_ms` 差很多 | `trace_report_rank.tsv`、`gpu_node*.csv` 的 `temp_c` 和 `reasons` | 先排除降频的卡（第 4.3 节），再看并行布局 |
 | trace 读不了（`gzip -t` 报错） | 写 trace 时有没有被杀 | 没法恢复，只能重跑这一格；以后等 `Finished dumping profiler traces` 出现在所有 rank 再停 |

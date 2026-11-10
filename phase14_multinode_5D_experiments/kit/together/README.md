@@ -1,4 +1,4 @@
-# Together：GPU cluster 里的两个 pod（2026-11-07）
+# Together：GPU cluster 里每个节点一个 pod（2026-11-07）
 
 依据：Together 文档
 - [GPU clusters](https://docs.together.ai/docs/gpu-clusters-quickstart)
@@ -28,7 +28,7 @@
 
 ## 1. 建集群（Together 控制台）
 
-- GPU 选 H200-SXM（`HW=h200`），抢占式 16 卡（2 个节点，kit 只支持 2 个节点）；编排选 Kubernetes。
+- GPU 选 H200-SXM（`HW=h200`），抢占式 16、32 或 64 卡（2、4 或 8 个节点，`../PLAYBOOK.md` 第 0.1 节）；编排选 Kubernetes。
   - 价格先核对卡型：控制台标的 $1.995/GPU·时 和文档里 H100 抢占式的价（$1.99）一致，文档里 H200 抢占式是 $2.99。选的是 H100，就把清单里的 `HW` 改成 `h100`，否则会按 141 GB 的模型和长度跑。
 - 共享存储 500 GiB 左右就够（venv、编译 cache、trace），跟集群一起建，并记下卷名。卷能扩不能缩（缩要找客服），文档没写最小值，所以先建小的。单独建的卷可能因为不在同一个数据中心而建集群失败。
 - **余额门槛：** 创建时余额要够"抢占式目标的 4 小时 + 按需部分的最短时长 + 同期的存储"，不够就报 `Insufficient credits for cluster creation`。16 张抢占式按 $1.995 算，4 小时是 $127.68，再加存储和按需节点。这只是门槛，实际按用量扣（抢占式每 1 到 2 分钟计一次）。
@@ -46,12 +46,12 @@ kubectl get nodes -L together.ai/compute-class
 kubectl get pv                                                      # 找到共享卷同名的那个 PV
 ```
 
-## 3. 拉起两个 pod
+## 3. 拉起 pod（每个节点一个）
 
 ```sh
 # 先改 together/p14_pods.yaml：volumeName 填上一步的 PV 名，HW；其余是快速路径的默认值
 kubectl create secret generic hf-token --from-literal=token=<hf_token>   # 可选，下载 tokenizer 用
-kubectl apply -f phase14_multinode_5D_experiments/kit/together/p14_pods.yaml
+bash phase14_multinode_5D_experiments/kit/k8s.sh apply 2      # 节点数：2、4 或 8
 bash phase14_multinode_5D_experiments/kit/k8s.sh status
 ```
 

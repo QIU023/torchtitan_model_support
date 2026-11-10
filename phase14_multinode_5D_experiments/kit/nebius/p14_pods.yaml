@@ -67,6 +67,9 @@ spec:
         env:
         - name: HW
           value: h200
+        # Node count, with completions and parallelism above: k8s.sh apply <2|4|8> sets all three.
+        - name: NNODES
+          value: "2"
         - name: MN_NET
           value: nebius
         - name: MN_BASE

@@ -1,6 +1,8 @@
 #!/bin/bash
 # Every row of one model's matrix on this hardware, for one stage. Run the same command on every node (NODE_RANK and
-# MASTER_ADDR set), or under srun with one task per node.
+# MASTER_ADDR set), or under srun with one task per node. The matrix is matrix_<model>.tsv on 2 nodes and
+# matrix_<model>_n<NNODES>.tsv on 4 or 8. A row's MN_FLAVOR (with {mem} for env.sh's MEM) and MN_SEQ override the
+# default flavor and every other length.
 # Usage: run_matrix.sh <k3|m3> <smoke|probe|warm|measure> [row ...]
 #   smoke    debug flavor, test tokenizer, c4_test, short sequence, 5 steps: every layout starts and steps
 #   probe    downscale flavor, c4_test, 3 steps at the row's length: per-rank memory (rows that OOM get shorter),
@@ -13,7 +15,8 @@ MODEL=$1
 STAGE=$2
 shift 2
 ONLY=" $* "
-MATRIX=${MN_MATRIX:-$K/matrix_$MODEL.tsv}
+MATRIX=${MN_MATRIX:-$K/matrix_${MODEL}$([ "$NNODES" = 2 ] || echo "_n$NNODES").tsv}
+[ -f "$MATRIX" ] || { echo "$MATRIX does not exist: no $MODEL matrix for $NNODES nodes" >&2; exit 1; }
 FLAVOR_VAR=FLAVOR_$MODEL
 ASSETS_VAR=ASSETS_$MODEL
 P=$OUT/$HW/$STAGE
@@ -32,9 +35,12 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   # Stage defaults a row's extra variables can override: probe's memory snapshot, measure's TensorBoard.
   case $STAGE in probe) envs+=(MN_MEMSNAP=${MN_MEMSNAP_PROBE-2}) ;; measure) envs+=(MN_TB=1) ;; esac
   skip=0
+  flavor=${!FLAVOR_VAR}
   for item in ${extra:-}; do
     case $item in
       nosmoke) [ $STAGE = smoke ] && skip=1 ;;
+      MN_FLAVOR=*) flavor=${item#MN_FLAVOR=}; flavor=${flavor//\{mem\}/$MEM} ;;
+      MN_SEQ=*) seq=${item#MN_SEQ=} ;;
       # b200 runs the h200 lengths, so it also takes the h200-only variables.
       *:*) tag=${item%%:*}
            if [ "$tag" = $HW ] || { [ $HW = b200 ] && [ "$tag" = h200 ]; }; then envs+=("${item#*:}"); fi ;;
@@ -50,13 +56,13 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
              MN_MICROBATCHES=$((pp > 1 ? 2 * pp : 1)) MN_STEPS=5 MN_DATASET=c4_test
              MN_CACHE=$OUT/cache/$HW/smoke_$MODEL) ;;
     probe)
-      envs+=(MN_FLAVOR=${!FLAVOR_VAR} MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=3 MN_DATASET=c4_test
+      envs+=(MN_FLAVOR=$flavor MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=3 MN_DATASET=c4_test
              MN_CACHE=$OUT/cache/$HW/probe_$MODEL) ;;
     warm)
-      envs+=(MN_FLAVOR=${!FLAVOR_VAR} MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=10 MN_DATASET=c4
+      envs+=(MN_FLAVOR=$flavor MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=10 MN_DATASET=c4
              MN_CACHE=$OUT/cache/$HW/$MODEL) ;;
     measure)
-      envs+=(MN_FLAVOR=${!FLAVOR_VAR} MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=${MEAS_STEPS:-30}
+      envs+=(MN_FLAVOR=$flavor MN_ASSETS=${!ASSETS_VAR} MN_SEQ=$seq MN_STEPS=${MEAS_STEPS:-30}
              MN_PROFILE=${PROFILE_FREQ:-25} MN_DATASET=c4 MN_CACHE=$OUT/cache/$HW/$MODEL) ;;
     *) echo "stage must be smoke, probe, warm or measure" >&2; exit 1 ;;
   esac

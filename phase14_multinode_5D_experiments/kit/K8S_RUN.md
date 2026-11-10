@@ -1,4 +1,4 @@
-# k8s 上两个 pod 的无人值守流程（Nebius、Together 共用，2026-11-07）
+# k8s 上每节点一个 pod 的无人值守流程（2、4 或 8 个节点；Nebius、Together 共用，2026-11-07）
 
 完整流程从 `PLAYBOOK.md` 开始，这里是运维细节。集群和 pod 怎么准备，见 `nebius/README.md` 或 `together/README.md`。pod 起来以后的事，两家一样，都在这里。**2026-11-08 在 Together 的 2 × 8 H100 上跑过：setup、tokenizer、通信检查由流水线完成，四行 measure 是用 `k8s.sh cell` 手动逐格跑的（设置和清单现在的默认值相同）。清单默认的快速路径（`MN_STAGES=measure`、`MN_COMM=0`、`MN_SEQ_FORCE`）由 `pipeline.py` 自己连续跑完，这一点只在本机模拟过。**
 
@@ -21,8 +21,8 @@
 
 ```sh
 K8S=phase14_multinode_5D_experiments/kit/k8s.sh
-bash $K8S status       # pod、setup、两个节点的心跳、最近的决策；跑完后显示 REPORT.txt
-bash $K8S logs         # 两个节点的流水线日志
+bash $K8S status       # pod、setup、每个节点的心跳、最近的决策；跑完后显示 REPORT.txt
+bash $K8S logs         # 每个节点的流水线日志
 bash $K8S collect      # 结果拉回本机（不含 trace 和 cache），每个阶段写 summary.tsv；隔几个小时收一次
 ```
 
@@ -30,10 +30,10 @@ bash $K8S collect      # 结果拉回本机（不含 trace 和 cache），每个
 - **改范围**（`MN_ROWS`、`MN_MODELS`、`MN_STAGES`、`MN_ORDER`、`MN_COMM_SWEEP`）：`bash $K8S scope MN_ROWS='k3_5d k3_B' MN_MODELS=k3`，再 `bash $K8S retask`；`bash $K8S scope` 不带参数是撤销。要改 `HW` 这类清单里的值，就改完清单后 `kubectl delete job p14`，再 `kubectl apply -f <清单>`，最后 `retask`。状态都在共享存储上，删 Job 不会丢。
 - **改脚本**（`launch.sh`、`run_comm.sh` 等）：`bash $K8S sync` 即可，从下一次尝试开始生效。titan 分支有新提交时（`env.sh` 的 `BRANCH_SHA` 变了），`sync` 之后再 `retask`：bootstrap 发现树不在这个提交上，会重跑 setup，把树切过去。
 - **停和启：**
-  - `bash $K8S stop`：当前这次尝试跑完再停（两个节点都退出，任务的进度保留）；
+  - `bash $K8S stop`：当前这次尝试跑完再停（所有节点都退出，任务的进度保留）；
   - `bash $K8S kill`：立刻停，当前这次尝试作废，以后重跑；
   - `bash $K8S start`：重新开始。
-- **手动跑一格：** 先 `stop` 或 `kill`，再用 `bash $K8S both '<命令>'` 让两个 pod 同时执行，例如：
+- **手动跑一格：** 先 `stop` 或 `kill`，再用 `bash $K8S both '<命令>'` 让所有 pod 同时执行，例如：
 
 ```sh
 bash $K8S both "MN_MODEL=k3 MN_FLAVOR=k3_16x141g MN_ASSETS=/mnt/shared/p14/assets/kimi_k3_tokenizer \
@@ -50,7 +50,7 @@ bash $K8S both "MN_MODEL=k3 MN_FLAVOR=k3_16x141g MN_ASSETS=/mnt/shared/p14/asset
 - `runs/<hw>/pipeline/`：流水线的状态：
   - `tasks.json`：冻结的任务列表；
   - `done/`、`giveup/`：每个任务的结局；
-  - `go/`、`rc/`：每次尝试的通知和两个节点各自的退出码；
+  - `go/`、`rc/`：每次尝试的通知和每个节点各自的退出码；
   - `hb/`：心跳；
   - `len/`、`try/`：probe 定下的长度和正在试的长度；
   - `log_node*.txt`：流水线日志；`run_node*.log`：每次尝试的启动输出；

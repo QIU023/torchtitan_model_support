@@ -6,13 +6,14 @@ V=$B/venv
 TT=$B/tt
 T=$B/wt_p14
 K=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-OUT=${MN_OUT:-$B/runs}
-BRANCH=phase14_multinode_5d
-BRANCH_SHA=ef6f2acb1
-TORCH_NIGHTLY=2.16.0.dev20261024
-TORCHVISION_NIGHTLY=0.30.0.dev20261024
+# 2, 4 or 8 nodes of 8 GPUs; 4 and 8 nodes keep their runs and pipeline state apart from the 2-node ones.
 NNODES=${NNODES:-2}
 NPROC=${NPROC:-8}
+OUT=${MN_OUT:-$B/runs$([ "$NNODES" = 2 ] || echo "_n$NNODES")}
+BRANCH=phase14_multinode_5d
+BRANCH_SHA=c8c229b59
+TORCH_NIGHTLY=2.16.0.dev20261024
+TORCHVISION_NIGHTLY=0.30.0.dev20261024
 MASTER_PORT=${MASTER_PORT:-29500}
 # Node rank and the address of node 0: set by hand, or by the launcher (Kubernetes Indexed Job, PyTorchJob, Slurm).
 NODE_RANK=${NODE_RANK:-${JOB_COMPLETION_INDEX:-${PET_NODE_RANK:-${SLURM_NODEID:-0}}}}
@@ -23,16 +24,24 @@ MASTER_ADDR=${MASTER_ADDR:-${PET_MASTER_ADDR:-}}
 ASSETS_k3=${ASSETS_K3:-$B/assets/kimi_k3_tokenizer}
 ASSETS_m3=${ASSETS_M3:-$B/assets/MiniMax-M3}
 
+# MEM is the size class of the downscale flavors (k3_<GPUs>x<MEM>); a matrix row's MN_FLAVOR may write {mem} for it.
 case $HW in
-  h100) FLAVOR_k3=k3_16x80g;  FLAVOR_m3=m3_16x80g;  GATE=fused ;;
+  h100) MEM=80g; GATE=fused ;;
   # B200 (180 GB) takes the 141 GB downscales and lengths.
-  h200|b200) FLAVOR_k3=k3_16x141g; FLAVOR_m3=m3_16x141g; GATE=fused ;;
+  h200|b200) MEM=141g; GATE=fused ;;
   # A100: the fused bounded KDA gate needs sm90; no NVLS on the A100 NVSwitch.
-  a100) FLAVOR_k3=k3_16x80g;  FLAVOR_m3=m3_16x80g;  GATE=reference; export NCCL_NVLS_ENABLE=0 ;;
+  a100) MEM=80g; GATE=reference; export NCCL_NVLS_ENABLE=0 ;;
   # Any other card (e.g. 8x RTX 5090 on a vast overlay): smoke and communication only; the downscales need 80 GB.
   # M3's full-attention layers move to flex there: the M3 5060 kit needed a shim to keep varlen off FlashAttention on sm120.
-  generic) FLAVOR_k3=k3_16x80g_small; FLAVOR_m3=m3_16x80g_small; GATE=reference; export MN_ATTN=${MN_ATTN:-flex} ;;
+  generic) MEM=80g_small; GATE=reference; export MN_ATTN=${MN_ATTN:-flex} ;;
   *) echo "HW must be h100, h200, b200, a100 or generic, got $HW" >&2; return 1 2>/dev/null || exit 1 ;;
+esac
+case $NNODES in
+  2) FLAVOR_k3=k3_16x$MEM; FLAVOR_m3=m3_16x$MEM ;;
+  # 32 and 64 GPUs: K3 only, with the deeper downscales (matrix_k3_n4.tsv, matrix_k3_n8.tsv).
+  4|8) FLAVOR_k3=k3_$((NNODES * NPROC))x$MEM; FLAVOR_m3=
+    [ "$HW" != generic ] || { echo "HW=generic runs on 2 nodes only" >&2; return 1 2>/dev/null || exit 1; } ;;
+  *) echo "NNODES must be 2, 4 or 8, got $NNODES" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
 
 # MN_NET=nebius: a Nebius GPU cluster (pods or VMs); the settings of Nebius's own NCCL test (docs.nebius.com,

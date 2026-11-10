@@ -6,6 +6,8 @@
 . "$(dirname "$0")/env.sh"
 set -u
 command -v ib_write_bw > /dev/null || { echo "ib_write_bw not installed (perftest), skipped"; exit 0; }
+# Nodes 0 and 1 stand for every pair: with more nodes, the others would contend for node 0's server ports.
+[ "$NODE_RANK" -le 1 ] || { echo "node $NODE_RANK: the RDMA check runs between nodes 0 and 1 only"; exit 0; }
 : "${MASTER_ADDR:?set MASTER_ADDR to the address of node 0}"
 R=$OUT/$HW/comm
 mkdir -p $R

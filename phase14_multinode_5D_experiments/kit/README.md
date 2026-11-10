@@ -30,6 +30,8 @@
 | `m3_16x141g` | H200 | D 3072，20 层，32 头 | 33.06B / 3.22B | 33.1 GB |
 | `m3_16x141g_small` | 141 GB 保守档 | D 2688，20 层，28 头 | 25.46B / 2.61B | 25.5 GB |
 
+32 卡和 64 卡的 K3 flavor（61 / 93 层，或 256 / 512 个专家）见 `PLAYBOOK.md` 第 0.1 节。
+
 - K3 的四档照 multinode.md §2.3（参数量是那里 refconfig 的数）：29 层（MLA 在 3、7、…、27 和 28），AttnRes 块 4，128 专家选 16 加 2 个共享，vocab 163840，视觉塔用 debugmodel 的 2 层 4 头。
 - M3 的四档是本 kit 新定的，按 M3 的比例只改宽度和层数：
   - 头数 D/96、4 个 KV 组、头维 128、partial RoPE 64；
@@ -109,21 +111,22 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `setup.sh` | 克隆分支、建 venv、装依赖、检查卡和 import |
 | `launch.sh` | 一个格子：torchrun 2 × 8，静态 rendezvous（node 0 持有 store，rank 0-7 在 node 0），`--module torchtitan_recipes.multinode_5d --config cell` |
 | `run_matrix.sh` | 一个模型、一个阶段，跑矩阵的每一行 |
-| `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型的组合和每种卡的长度 |
+| `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型在 2 节点上的组合和每种卡的长度 |
+| `matrix_k3_n4.tsv`、`matrix_k3_n8.tsv` | K3 在 4 节点、8 节点上的组合（`PLAYBOOK.md` 第 0.1、5.1 节） |
 | `summarize.py` | 解析日志，出每格一行的 TSV |
 | `trace_report.py`、`merge_traces.py` | 每格 trace 的时间拆分（计算、按进程组的暴露通信、拷贝、空闲，并入 tps、MFU、显存和 IB 速率）；一格所有 rank 合成一份 Perfetto trace |
 | `monitor.py` | 每个节点的 GPU 和 IB 采样器（含温度和降频原因）；`--show` 加 DCGM 看最新一次，`--summary` 按任务汇总 |
-| `dashboard.py` | pod 0 上的实时网页（`k8s.sh dash`）：每步 MFU / tps / 步时间、每个 rank 的最新一步、DCGM、两个节点的日志 |
+| `dashboard.py` | pod 0 上的实时网页（`k8s.sh dash`）：每步 MFU / tps / 步时间、每个 rank 的最新一步、DCGM、每个节点的日志 |
 | `PLAYBOOK.md` | 完整流程：步骤、每种并行配置的命令、profiler、NCCL / RDMA 验证和调优 |
 | `rdma_bw.sh` | 每个 IB 口的 RDMA 原始带宽（perftest 的 `ib_write_bw`，不经过 NCCL），`run_comm.sh` 先跑它 |
 | `comm_sweep.tsv`、`comm_compare.py` | NCCL 调优变体（每行一个设置）；各变体和 NCCL 默认选择的 α、busbw 对比 |
 | `collect.sh` | 没有共享文件系统时，在 node 0 上拉回 node 1 的日志并汇总 |
 | `RUNBOOK.md` | 租卡之后从开机到结果回 logbook 的逐步命令 |
 | `run_comm.sh` | 两台一起：comm_bench 加 NCCL INFO 日志，判断走 IB 还是 socket、有没有 GPUDirect RDMA，列出大消息 busbw |
-| `K8S_RUN.md` | k8s 上两个 pod 的无人值守流程（Nebius、Together 共用）：自动做什么、手动操作、状态文件、抢占 |
+| `K8S_RUN.md` | k8s 上每节点一个 pod（2、4 或 8 个）的无人值守流程（Nebius、Together 共用）：自动做什么、手动操作、状态文件、抢占 |
 | `nebius/README.md`、`nebius/p14_pods.yaml` | Nebius：建 GPU cluster、共享文件系统、node group 和 CSI，pod 清单 |
 | `together/README.md`、`together/p14_pods.yaml` | Together：建集群、kubeconfig、共享卷，pod 清单 |
-| `k8s.sh` | 本机操控两个 pod：status、logs、stop / kill / start、sync、retask、scope、collect、fetch、dash、top / watch、tail、report、trace、tb、cell、both |
+| `k8s.sh` | 本机操控每个节点的 pod：apply、status、logs、stop / kill / start、sync、retask、scope、collect、fetch、dash、top / watch、tail、report、trace、tb、cell、both |
 | `bootstrap.sh` | pod 的入口：容器包、共享 setup（加锁）、流水线（崩了自动重启） |
 | `pipeline.py` | 无人值守流水线：comm、tokenizer、每行 smoke / probe / warm / measure；断点续跑、OOM 自动减半、两节点心跳协同 |
 | `setup_node.sh`、`assets.sh` | 每个容器的系统包和 IB 报告；两个模型的 tokenizer（K3 转换失败时退到 Qwen3） |
