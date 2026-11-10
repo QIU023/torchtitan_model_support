@@ -109,6 +109,7 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 | `measure_trace_report.tsv` | `trace_report.py`：每格一行，第 2 节第二张表的来源 |
 | `measure_trace_report_pg.tsv` | 每格、每个进程组、每种 collective 一行：次数、kernel 时间、暴露时间、字节数、`eff_busbw` |
 | `measure_trace_report_rank.tsv` | 每格、每个 rank 一行：计算、暴露通信、拷贝、空闲、通信总时间 |
+| `measure_trace_report_groups.tsv` | 每格每个进程组的哈希名、标签和成员 rank：Perfetto 里点 NCCL kernel 看到的 `Process Group Name` 在这里查 |
 | `gpu_by_cell.tsv` | 每格、每张卡：平均利用率、功耗、最高温度、SM 频率、降频采样占比（从 `monitor.py` 的 2 秒采样按每格的训练时间段切出来） |
 | `comm/` | 通信检查的结论和每个 IB 口的 RDMA 带宽 |
 | `cells/<格>/` | 每格两个节点的 `env_node*.txt`（全部 `MN_*`、`NCCL_*` 变量）、`tree.txt`（titan 提交号）、`rc_node*` |
@@ -117,7 +118,7 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 
 | 文件 | 内容 | 用什么打开 |
 |---|---|---|
-| `k3_A_1108_170956_measure_trace.json.gz` | `k3_A` 16 个 rank 合成一份的 GPU trace（142 MB）；B、C、D 还没合成，按第 5.1 节的命令生成 | https://ui.perfetto.dev |
+| `k3_<行>_<时间>_measure_trace.json.gz` | 一格 16 个 rank 合成一份的 GPU trace：A 142 MB，B 333 MB，C 143 MB，D 301 MB | https://ui.perfetto.dev |
 | `raw/h100/manual/measure/<格>/tt/profiling/traces/iteration_5/rank<r>_trace.json.gz` | 每个 rank 自己的完整 trace，含 CPU 侧（40 到 110 MB） | Perfetto |
 | `raw/h100/manual/measure/<格>/node0.log`、`node1.log` | 两个节点 16 个 rank 的完整训练日志 | 文本编辑器 |
 | `raw/h100/manual/measure/<格>/tt/tb/` | TensorBoard（最后一个 PP stage 的 loss 等） | `tensorboard --logdir` |
@@ -136,7 +137,7 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 ### 5.1 打开
 
 1. 浏览器打开 https://ui.perfetto.dev，左边点 "Open trace file"，选 `k3_A_1108_170956_measure_trace.json.gz`。不用解压，文件在浏览器本地解析，不会上传。一两分钟才能加载完。
-2. 其他三格的合成文件和进程组哈希表（`measure_trace_report_groups.tsv`）还没生成。在 Git Bash 里跑下面的命令，合成每格约 10 分钟，哈希表约 10 分钟：
+2. 四格的合成文件和进程组哈希表都已生成。要从 `raw/` 重新生成，在 Git Bash 里跑下面的命令，合成每格 6 到 14 分钟，哈希表约 10 分钟：
 
 ```sh
 cd phase14_multinode_5D_experiments
@@ -169,7 +170,7 @@ python kit/merge_traces.py $M/k3_A_1108_170956 --ranks 5,12,13 --out $R/k3_A_r5_
 - NCCL kernel（名字以 `ncclDevKernel_` 开头）：
   - `Collective name`：`all_to_all`、`allGatherSingleImpl`、`reduceScatterSingleImpl`、`all_reduce`、`send`、`recv`；
   - `Group size`、`In msg nelems`（元素个数）、`dtype`；
-  - `Process Group Name`：一个哈希，到 `measure_trace_report_groups.tsv`（第 5.1 节的命令生成）里查它是 TP、EP、PP 还是哪一组，以及有哪些 rank。
+  - `Process Group Name`：一个哈希，到 `measure_trace_report_groups.tsv` 里查它是 TP、EP、PP 还是哪一组，以及有哪些 rank。
 - all-to-all 和 PP 的 send / recv 都用 `ncclDevKernel_SendRecv` 这个 kernel，要看 `Collective name` 才能分开。
 - 计算流上还有 GPU 标注：`kda/...` 是 KDA 的各段 kernel（前向 `chunk_kda_fwd_intra`、反向 `backward_*` 等）。通信流上的标注是 collective 的名字。
 - 在时间轴上拖出一段，下方会按名字汇总这段里每种 slice 的次数和总时长，可以估算一段里计算和通信各占多少。
