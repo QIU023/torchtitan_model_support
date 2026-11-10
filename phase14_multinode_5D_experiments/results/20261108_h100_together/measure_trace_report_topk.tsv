@@ -1,0 +1,81 @@
+cell	family	kernel	per_rank	ms_per_rank	mean_us
+k3_A_1108_170956	nccl	ncclDevKernel_SendRecv	1312.00	11825.16	9013.08
+k3_A_1108_170956	nccl	ncclDevKernel_AllGather_RING	968.50	800.42	826.45
+k3_A_1108_170956	gemm	_ZN7cutlass13device_kernelIN2at4cuda6detail25enable_3x_kernel_for_sm9xINS_4gemm6kernel13GemmUniversalINS5_17Gr	1568.00	768.85	490.34
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<float, float, float, at::native::b	8262.00	758.03	91.75
+k3_A_1108_170956	nccl	ncclDevKernel_ReduceScatter_bf16_RING	936.00	643.24	687.22
+k3_A_1108_170956	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float	4878.00	636.18	130.42
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::b	4352.00	327.86	75.34
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<8, at::native::converting_copy_kernel_cuda<float, c10::BFloat16	6980.00	302.50	43.34
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, 	5143.00	290.29	56.44
+k3_A_1108_170956	aten	void at::native::	3966.00	272.46	68.70
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BUnaryFunctor<float, float, float, at::native::b	3159.50	264.88	83.84
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::converting_copy_kernel_cuda<c10::BFloat16, float	8345.50	226.97	27.20
+k3_A_1108_170956	nccl	ncclDevKernel_AllReduce_f32_RING	362.80	220.90	608.96
+k3_A_1108_170956	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::converting_copy_ker	1824.00	207.70	113.87
+k3_A_1108_170956	gemm	nvjet_sm90_tst_192x192_64x3_2x1_v_bz_coopB_NNN	2000.00	199.30	99.65
+k3_A_1108_170956	attention	triton_tem_fused_flex_attention_backward_1	80.00	197.07	2463.32
+k3_A_1108_170956	aten	void at::native::vectorized_elementwise_kernel<4, at::native::tanh_kernel_cuda	1824.00	175.74	96.35
+k3_A_1108_170956	aten	void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::nativ	3172.50	152.45	48.05
+k3_A_1108_170956	aten	void 	3840.00	149.52	38.94
+k3_A_1108_170956	gemm	void gemv2N_kernel<int, int, float, float, float, float, 128, 1, 2, 4, 1, false, cublasGemvParamsEx<int, cubla	920.00	132.46	143.98
+k3_B_1108_171837	nccl	ncclDevKernel_ReduceScatter_f32_RING	1248.00	12021.17	9632.35
+k3_B_1108_171837	nccl	ncclDevKernel_AllGather_RING	5088.00	11336.62	2228.11
+k3_B_1108_171837	nccl	ncclDevKernel_SendRecv	2240.00	5996.51	2677.01
+k3_B_1108_171837	nccl	ncclDevKernel_ReduceScatter_bf16_RING	2208.00	1566.28	709.36
+k3_B_1108_171837	gemm	_ZN7cutlass13device_kernelIN2at4cuda6detail25enable_3x_kernel_for_sm9xINS_4gemm6kernel13GemmUniversalINS5_17Gr	3136.00	892.40	284.57
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<float, float, float, at::native::b	16524.00	758.60	45.91
+k3_B_1108_171837	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float	9756.00	638.07	65.40
+k3_B_1108_171837	aten	void at::native::	14292.00	566.17	39.61
+k3_B_1108_171837	nccl	ncclDevKernel_AllReduce_f32_RING	6165.00	548.77	89.01
+k3_B_1108_171837	nccl	ncclDevKernel_AllReduce_bf16_RING	196.00	495.50	2528.04
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, 	13217.90	342.70	25.93
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::b	8703.00	327.53	37.63
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<8, at::native::converting_copy_kernel_cuda<float, c10::BFloat16	14160.00	303.59	21.44
+k3_B_1108_171837	attention	triton_tem_fused_flex_attention_backward_1	160.00	269.92	1686.97
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BUnaryFunctor<float, float, float, at::native::b	6318.00	266.15	42.12
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::converting_copy_kernel_cuda<c10::BFloat16, float	15616.00	235.40	15.07
+k3_B_1108_171837	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::converting_copy_ker	3648.00	215.51	59.08
+k3_B_1108_171837	gemm	nvjet_sm90_tst_192x192_64x3_2x1_v_bz_coopB_NNN	3104.00	185.17	59.66
+k3_B_1108_171837	aten	void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::nativ	6344.00	174.67	27.53
+k3_B_1108_171837	aten	void at::native::vectorized_elementwise_kernel<4, at::native::tanh_kernel_cuda	3648.00	174.10	47.72
+k3_C_1108_172528	nccl	ncclDevKernel_SendRecv	1312.00	14403.29	10978.12
+k3_C_1108_172528	nccl	ncclDevKernel_AllGather_RING	664.50	980.96	1476.24
+k3_C_1108_172528	gemm	_ZN7cutlass13device_kernelIN2at4cuda6detail25enable_3x_kernel_for_sm9xINS_4gemm6kernel13GemmUniversalINS5_17Gr	1568.00	791.53	504.80
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<float, float, float, at::native::b	8262.00	759.31	91.90
+k3_C_1108_172528	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float	4814.00	631.36	131.15
+k3_C_1108_172528	nccl	ncclDevKernel_ReduceScatter_f32_RING	152.50	605.61	3971.23
+k3_C_1108_172528	aten	void at::native::	4910.50	407.91	83.07
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::b	4352.50	328.61	75.50
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<8, at::native::converting_copy_kernel_cuda<float, c10::BFloat16	7108.00	303.58	42.71
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, 	4028.00	274.80	68.22
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BUnaryFunctor<float, float, float, at::native::b	2975.00	265.30	89.18
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::converting_copy_kernel_cuda<c10::BFloat16, float	7300.50	232.96	31.91
+k3_C_1108_172528	gemm	nvjet_sm90_tss_192x192_64x3_2x1_v_badd_coopB_NTN	971.00	231.11	238.01
+k3_C_1108_172528	attention	triton_tem_fused_flex_attention_backward_1	80.00	227.39	2842.43
+k3_C_1108_172528	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::converting_copy_ker	1824.00	211.64	116.03
+k3_C_1108_172528	aten	void at::native::vectorized_elementwise_kernel<4, at::native::tanh_kernel_cuda	1824.00	176.17	96.58
+k3_C_1108_172528	aten	void 	4544.00	157.85	34.74
+k3_C_1108_172528	gemm	nvjet_sm90_tst_192x192_64x3_2x1_v_bz_coopB_NNN	1768.00	157.07	88.84
+k3_C_1108_172528	nccl	ncclDevKernel_ReduceScatter_bf16_RING	72.00	147.31	2045.95
+k3_C_1108_172528	aten	void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::nativ	2980.50	136.93	45.94
+k3_D_1108_173242	nccl	ncclDevKernel_SendRecv	2624.00	15864.63	6045.97
+k3_D_1108_173242	nccl	ncclDevKernel_AllGather_RING	3184.00	3082.65	968.17
+k3_D_1108_173242	nccl	ncclDevKernel_ReduceScatter_bf16_RING	2208.00	1616.79	732.24
+k3_D_1108_173242	gemm	_ZN7cutlass13device_kernelIN2at4cuda6detail25enable_3x_kernel_for_sm9xINS_4gemm6kernel13GemmUniversalINS5_17Gr	3136.00	786.71	250.86
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<float, float, float, at::native::b	16510.00	751.23	45.50
+k3_D_1108_173242	nccl	ncclDevKernel_AllReduce_bf16_RING	224.00	641.56	2864.13
+k3_D_1108_173242	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::BinaryFunctor<float	9742.00	612.73	62.90
+k3_D_1108_173242	nccl	ncclDevKernel_ReduceScatter_f32_RING	288.00	351.44	1220.29
+k3_D_1108_173242	aten	void at::native::	9214.00	330.78	35.90
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::AUnaryFunctor<float, float, float, at::native::b	8688.50	322.75	37.15
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<float>, std::array<char*, 3ul>, 	10643.50	310.23	29.15
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<8, at::native::converting_copy_kernel_cuda<float, c10::BFloat16	14199.00	301.42	21.23
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::BUnaryFunctor<float, float, float, at::native::b	6119.50	261.43	42.72
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::converting_copy_kernel_cuda<c10::BFloat16, float	16665.50	239.39	14.36
+k3_D_1108_173242	aten	void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::converting_copy_ker	3648.00	202.73	55.57
+k3_D_1108_173242	attention	triton_tem_fused_flex_attention_backward_1	160.00	195.05	1219.07
+k3_D_1108_173242	nccl	ncclDevKernel_AllReduce_f32_RING	563.10	184.91	328.36
+k3_D_1108_173242	aten	void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::nativ	6316.50	170.54	27.00
+k3_D_1108_173242	aten	void at::native::vectorized_elementwise_kernel<4, at::native::tanh_kernel_cuda	3648.00	170.40	46.71
+k3_D_1108_173242	aten	void 	9216.00	159.13	17.27

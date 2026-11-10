@@ -109,6 +109,8 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 | `measure_trace_report.tsv` | `trace_report.py`：每格一行，第 2 节第二张表的来源 |
 | `measure_trace_report_pg.tsv` | 每格、每个进程组、每种 collective 一行：次数、kernel 时间、暴露时间、字节数、`eff_busbw` |
 | `measure_trace_report_rank.tsv` | 每格、每个 rank 一行：计算、暴露通信、拷贝、空闲、通信总时间 |
+| `measure_trace_report_kernels.tsv` | 每格、每个 rank 的 kernel 时间按类分，计算流上 kernel 的个数和大小，PP 前向、反向动作的 GPU 时间（读法见 `../../kit/TRACE_READING.md`） |
+| `measure_trace_report_topk.tsv` | 每格耗时最多的 20 个 kernel |
 | `measure_trace_report_groups.tsv` | 每格每个进程组的哈希名、标签和成员 rank：Perfetto 里点 NCCL kernel 看到的 `Process Group Name` 在这里查 |
 | `gpu_by_cell.tsv` | 每格、每张卡：平均利用率、功耗、最高温度、SM 频率、降频采样占比（从 `monitor.py` 的 2 秒采样按每格的训练时间段切出来） |
 | `comm/` | 通信检查的结论和每个 IB 口的 RDMA 带宽 |
