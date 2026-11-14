@@ -1,5 +1,5 @@
-cell	ranks	step_ms	tps	mfu	peak_mem_gib	peak_rank	compute_pct	exposed_pct	exposed_max_pct	idle_pct	idle_max_pct	copy_pct	overlap_pct	unattributed_pct	top_exposed	ib_tx_GBps	ib_rx_GBps
-k3_A_1108_170956	16	17562.36	1872.50	5.75	61.94	0	44.25	47.73	55.86	7.54	15.20	0.48	22.00	0.00	PP 25.3%, EP 13.3%, TP 8.1%	-	-
-k3_B_1108_171837	16	35984.85	995.00	3.05	30.96	3	24.58	59.02	69.02	16.14	61.09	0.26	19.37	0.00	FSDP/LOSS 20.4%, EFSDP 13.7%, CPxTP/EP 13.3%	-	-
-k3_C_1108_172528	16	19455.76	1683.00	5.16	63.37	3	41.09	51.27	57.93	7.10	10.94	0.53	19.43	0.00	PP 25.7%, EP/FSDP/LOSS 20.5%, CP 5.0%	-	-
-k3_D_1108_173242	16	30682.02	1172.50	3.60	43.23	7	26.69	51.72	58.69	21.23	46.08	0.36	14.40	0.00	PP 23.9%, CPxTP/EP 11.9%, CP/FSDP/LOSS 8.1%	-	-
+cell	ranks	step_ms	tps	mfu	peak_mem_gib	peak_rank	compute_pct	exposed_pct	exposed_max_pct	idle_pct	idle_max_pct	copy_pct	overlap_pct	unattributed_pct	top_exposed	ib_tx_GBps	ib_rx_GBps	straggler_ms	straggler_rank
+k3_A_1108_170956	16	17562.36	1872.50	5.75	61.94	0	44.25	47.73	55.86	7.54	15.20	0.48	22.00	0.00	PP 25.3%, EP 13.3%, TP 8.1%	-	-	5716.01	13
+k3_B_1108_171837	16	35984.85	995.00	3.05	30.96	3	24.58	59.02	69.02	16.14	61.09	0.26	19.37	0.00	FSDP/LOSS 20.4%, EFSDP 13.7%, CPxTP/EP 13.3%	-	-	3579.59	13
+k3_C_1108_172528	16	19455.76	1683.00	5.16	63.37	3	41.09	51.27	57.93	7.10	10.94	0.53	19.43	0.00	PP 25.7%, EP/FSDP/LOSS 20.5%, CP 5.0%	-	-	7922.76	13
+k3_D_1108_173242	16	30682.02	1172.50	3.60	43.23	7	26.69	51.72	58.69	21.23	46.08	0.36	14.40	0.00	PP 23.9%, CPxTP/EP 11.9%, CP/FSDP/LOSS 8.1%	-	-	2172.85	13

@@ -5,7 +5,11 @@
   - 最快的是 `k3_A`（PP 跨节点，TP 4），每步 17.0 秒，MFU 5.9%；
   - 最慢的是 `k3_B`（没有 PP，FSDP 跨节点），每步 30.9 秒，MFU 3.3%。
 - 四格里大多数 rank 每步的计算时间都是 7 到 9 秒；步时间的差别几乎全在没被盖住的通信和空闲上。
-- node 1 的 GPU 5（rank 13）在四格里都过热降频。录 trace 的那一步它降频得最厉害，所以 trace 的拆分里有它的影响（第 3.5 节）。
+- **这四格的结论都是暂定的，要换掉降频卡重测后才能用**（第 3.5 节）：
+  - node 1 的 GPU 5（rank 13）在四格里都过热降频，录 trace 的那一步降频得最厉害；
+  - `k3_A` 里它每步计算 13.1 秒，其他卡的中位数 7.4 秒，多出约 5.7 秒，约一步的三分之一；
+  - `k3_A` 的 PP 暴露 25%（约 4.4 秒），而 pp 2、VPP 2、16 个 micro-batch 的理论气泡 (p−1)/(v·m) 只有约 3%；
+  - PP、EP、TP 的暴露里各有多少是在等这张卡，现有数据分不开。
 
 ## 1. 环境
 
@@ -97,7 +101,10 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 - 每个 collective 都要等最慢的 rank，所以：
   - rank 13 自己的暴露通信很少（`k3_A` 2.6 秒，其他 rank 7 到 10 秒）；
   - 其他 rank 的暴露通信里有一部分是在等它。
-- 这四格的绝对值都因为它偏慢；四格都受它影响，但影响的大小不同（上表）。格子之间差得多的地方（`k3_B` 比 `k3_A` 慢 80%）结论可靠，差得少的地方（`k3_A` 和 `k3_C`）要在没有慢卡的节点上重测。
+- 它对四格的影响比第 3.1 到 3.4 节读起来要大：
+  - `k3_A` 的 PP 暴露 25%（约 4.4 秒），理论气泡约 3%；rank 13 多算的 5.7 秒和这个差距是同一个量级；
+  - 所以"PP 是最大的暴露项"不能当结论，PP、EP、TP 的暴露里各有多少是在等它，要换卡重测才知道；
+  - 差得多的地方（`k3_B` 比 `k3_A` 慢 80%）方向大概率不变，差得少的地方（`k3_A` 和 `k3_C`）排不出先后。
 
 ## 4. 文件
 
@@ -106,11 +113,12 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 | 文件 | 内容 |
 |---|---|
 | `measure_summary.tsv` | `summarize.py`：每格一行，退出码、步数、loss、峰值显存、tps / MFU / 步时间（第 3 步以后的中位数，含第 5 步）、第 1 步时间 |
-| `measure_trace_report.tsv` | `trace_report.py`：每格一行，第 2 节第二张表的来源 |
+| `measure_trace_report.tsv` | `trace_report.py`：每格一行，第 2 节第二张表的来源；`straggler_ms` / `straggler_rank` 是计算时间最多的 rank 比中位数多出的毫秒数和它的编号 |
 | `measure_trace_report_pg.tsv` | 每格、每个进程组、每种 collective 一行：次数、kernel 时间、暴露时间、字节数、`eff_busbw` |
 | `measure_trace_report_rank.tsv` | 每格、每个 rank 一行：计算、暴露通信、拷贝、空闲、通信总时间 |
 | `measure_trace_report_kernels.tsv` | 每格、每个 rank 的 kernel 时间按类分，计算流上 kernel 的个数和大小，PP 前向、反向动作的 GPU 时间（读法见 `../../kit/TRACE_READING.md`） |
 | `measure_trace_report_topk.tsv` | 每格耗时最多的 20 个 kernel |
+| `measure_pairs_report.tsv` | 成对对照（`../../kit/pairs_k3.tsv`）：11-08 只跑了四格，多数对缺一边；`k3_5d` 是 4096 那次，和 16K 的格子长度不同，不给差值 |
 | `measure_trace_report_groups.tsv` | 每格每个进程组的哈希名、标签和成员 rank：Perfetto 里点 NCCL kernel 看到的 `Process Group Name` 在这里查 |
 | `gpu_by_cell.tsv` | 每格、每张卡：平均利用率、功耗、最高温度、SM 频率、降频采样占比（从 `monitor.py` 的 2 秒采样按每格的训练时间段切出来） |
 | `comm/` | 通信检查的结论和每个 IB 口的 RDMA 带宽 |
@@ -221,14 +229,25 @@ python kit/merge_traces.py $M/k3_A_1108_170956 --ranks 5,12,13 --out $R/k3_A_r5_
 ## 7. 局限
 
 - 每格只有 5 步、一次运行、一步 trace，没有同一格重复两次的噪声底线，所以差几个百分点的格子不能排先后。
+- 5D 全开那一格没有能用的数据：32K OOM；4096 跑了 25 步，但写 trace 时被杀，16 个 trace 全部截断。
 - eager：kernel 没调优，MFU 比编译后低，四格同口径。
 - 录 trace 的第 5 步比前几步慢 5% 到 30%（profiler 的开销，加上 rank 13 降频更厉害），trace 拆分是这一步的。
 - 一张降频的卡影响了全部四格（第 3.5 节）。
 - MFU 是 titan 的口径：(6 × 激活参数 + 注意力算子 FLOPs) × tps ÷ 989 TFLOPS（H100 bf16 稠密峰值）。
 
-## 8. 下一轮
+## 8. MFU 差距拆分（待填）
 
-- 按 `../../kit/PLAYBOOK.md` 第 0 节的快速路径，一次跑完矩阵的 9 行。
-- 跑之前先看 dashboard 的 DCGM 和 `gpu_node*.csv`，有过热降频的卡就换节点。
+纸面估计约 14%（`../../multinode.md` §0.2：(A) 在 8K 13.6%，32K 14.4%），实测 5.9%。差距靠三组成对的 run 拆开，每一项都是两次 run 的差，不是推算：
+
+| 一项 | 怎么量 | 结果 |
+|---|---|---|
+| 慢卡 | 筛查过关的节点上重测 `k3_A`，对 11-08 的 `k3_A` | 待测 |
+| eager | 同一次里 `k3_A_compile` 对 `k3_A` | 待测 |
+| 暴露通信和气泡 | 编译后、没有慢卡的那次 `k3_A` 的 trace 拆分 | 待测 |
+| 噪声底线 | `k3_A` 对 `k3_A_rep` | 待测 |
+
+## 9. 下一轮
+
+- 按 `../../kit/PLAYBOOK.md` 第 0 节的快速路径跑整个矩阵。开跑前的筛查会自动挡掉降频的卡；重复行、compile 行、5D 全开 16K 都已经在矩阵里，收尾自动出成对对照表 `pairs_report_k3.tsv`。
 - `k3_B` 和 `k3_B_keep` 对照，看 FSDP 跨节点时每个 micro-batch 重新 gather 的代价。
 - `k3_D` rank 12 和 `k3_B` rank 2 的空闲，按第 5.4 节看 CPU 侧。

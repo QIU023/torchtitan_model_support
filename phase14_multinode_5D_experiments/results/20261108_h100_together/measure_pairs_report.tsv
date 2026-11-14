@@ -1,0 +1,9 @@
+a	b	question	a_step_s	b_step_s	step_change_pct	a_mfu	b_mfu	noise_pct	beyond_noise	a_top_exposed	b_top_exposed	a_straggler_ms	b_straggler_ms	conclusion
+k3_A	k3_A_rep	噪声：同一格紧接着再跑一次	16.99	-	-	5.92	-	-	-	PP 25.3%, EP 13.3%, TP 8.1%	-	5716.01	-	
+k3_A	k3_A_compile	eager 对 compile	16.99	-	-	5.92	-	-	-	PP 25.3%, EP 13.3%, TP 8.1%	-	5716.01	-	
+k3_A	k3_C	TP 4 对 CP 4（PP 2、dp 2 不变）	16.99	19.03	12.03	5.92	5.45	-	-	PP 25.3%, EP 13.3%, TP 8.1%	PP 25.7%, EP/FSDP/LOSS 20.5%, CP 5.0%	5716.01	7922.76	
+k3_A	k3_5d	TP 4 对 CP 2 × TP 2	16.99	43.37	-	5.92	1.86	-	seq 16384 vs 4096	PP 25.3%, EP 13.3%, TP 8.1%	-	5716.01	-	
+k3_B	k3_B_keep	FSDP 每个 micro-batch 重新 gather、归约梯度，对整步一次	30.94	-	-	3.25	-	-	-	FSDP/LOSS 20.4%, EFSDP 13.7%, CPxTP/EP 13.3%	-	3579.59	-	
+k3_B	k3_B_ep16	EP 8 在节点内，对 EP 16 跨两个节点	30.94	-	-	3.25	-	-	-	FSDP/LOSS 20.4%, EFSDP 13.7%, CPxTP/EP 13.3%	-	3579.59	-	
+k3_B_keep	k3_B_ep16_keep	整步不 reshard 时：EP 8 对 EP 16	-	-	-	-	-	-	-	-	-	-	-	
+k3_D	k3_D_ulysses	CP 的 all-gather 对 Ulysses	24.67	-	-	4.07	-	-	-	PP 23.9%, CPxTP/EP 11.9%, CP/FSDP/LOSS 8.1%	-	2172.85	-	
