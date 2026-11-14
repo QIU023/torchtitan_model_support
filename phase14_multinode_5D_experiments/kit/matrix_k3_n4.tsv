@@ -1,19 +1,24 @@
 # name	cell	seq_h100	seq_h200	seq_a100	extra (KEY=VAL applies everywhere, hw:KEY=VAL only on that hw; nosmoke skips the smoke stage)
 # 4 nodes x 8 GPUs. Default flavor k3_32x{mem}: 61 layers, 128 experts, attention-residual blocks of 8.
 # MN_FLAVOR picks another flavor ({mem}: 80g or 141g by hardware); MN_SEQ pins the row's length over MN_SEQ_FORCE.
+# +core marks the rows only 4 nodes answer (k8s.sh apply 4 +core runs just those).
 # Every row keeps 524288 tokens per step and data parallelism 2 (or 1); the extra GPUs go to PP across nodes and
 # to a bigger model, while TP, CP and EP stay inside a node unless the row says otherwise.
 # The 11-08 model on twice the GPUs: what PP 4 costs against k3_A at PP 2.
-k3_A4_ref	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem}
-k3_A4_ref_v4	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem} MN_VPP=4
+k3_A4_ref	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem} +core
+k3_A4_ref_v4	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem} MN_VPP=4 +core
 # The 61-layer model: PP across the four nodes, everything else inside a node.
-k3_A4	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	
+k3_A4	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	+core
+# The same cell again right after: its difference is the noise floor of every pair.
+k3_A4_rep	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	+core
 k3_A4_v4	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4
 k3_5d4	pp=4,dp=2,cp=2,tp=2,ep=8	16384	16384	16384	
 k3_C4	pp=4,dp=2,cp=4,ep=8	16384	16384	16384	
 k3_D4	pp=4,cp=4,tp=2,ep=8	16384	16384	16384	
 # Twice the experts instead of twice the layers: EP 8 inside a node against EP 16 across two nodes.
-k3_E4_ep8	pp=2,dp=2,cp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e256
-k3_E4_ep16	pp=2,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e256
+k3_E4_ep8	pp=2,dp=2,cp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e256 +core
+k3_E4_ep16	pp=2,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e256 +core
 # Long context: CP 4 x TP 4 spans two nodes, no PP, four sequences of 64K per step.
-k3_L4	dp=2,cp=4,tp=4,ep=8	65536	65536	65536	MN_SEQ=65536 MN_FSDP_KEEP=1
+k3_L4	dp=2,cp=4,tp=4,ep=8	65536	65536	65536	MN_SEQ=65536 MN_FSDP_KEEP=1 +core
+# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume).
+k3_A4_compile	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_COMPILE=1

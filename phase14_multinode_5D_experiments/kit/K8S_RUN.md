@@ -9,13 +9,14 @@
   2. 共享存储上的 setup：venv、torch nightly、titan 分支 `phase14_multinode_5d`。只让一个 pod 做，另一个等；
   3. 启动 GPU 和 IB 采样器 `monitor.py`，再启动 `pipeline.py`；流水线崩了就自动重启，直到全部完成或者有 `STOP` 文件。
 - **pipeline.py** 按固定顺序跑：
+  - `preflight`（默认开，`MN_PREFLIGHT=0` 跳过）：每张卡 30 秒 GEMM 加大消息通信和 RDMA，不过关就停在矩阵之前（`PLAYBOOK.md` 第 4.1 节）；
   - `comm`（`MN_COMM=1` 时）：两节点通信检查，判断 IB 和 GPUDirect RDMA，测 busbw；快速路径不跑，每一格自己的 NCCL INFO 日志（`<格>/nccl/`）给出同样的 IB / GDR 结论；
   - `assets.k3`、`assets.m3`：准备 tokenizer；K3 的转换失败时，自动退到 Qwen3 的 tokenizer；
   - 矩阵的每一行依次跑 `MN_STAGES` 里的阶段（`MN_ORDER=row`，默认）。清单默认只有 measure；完整研究是 smoke、probe、warm、measure。设 `MN_ROWS=k3_5d`，就只跑 5D 全开这一行。
 - **断点续跑：** 状态放在共享存储的 `<BASE>/runs/<hw>/pipeline/` 下。pod 被抢占、重建以后，从第一个没完成的任务接着跑；被打断的那次尝试不计入失败。
 - **自动调长度：** probe 遇到 OOM 时把长度减半重试（最低 4096），warm 和 measure 用 probe 最后定下的长度。这一行没有 probe 任务时（快速路径），warm 和 measure 自己在 OOM 后减半重试。
 - **失败处理：** 一格连续真失败 2 次（`MN_MAX_FAILS`），就放弃这一格，同时跳过它后面的阶段，继续下一格。
-- **收尾：** 写出 `REPORT.txt`、每个阶段的 `summary.tsv`、采样汇总、measure 的 trace 报告（第 4 节）和 `ALL_DONE`。pod 不退出，方便收集结果。
+- **收尾：** 写出 `REPORT.txt`、每个阶段的 `summary.tsv`、采样汇总、measure 的 trace 报告（第 4 节）、成对对照 `pairs_report_<model>.tsv` 和 `ALL_DONE`。pod 不退出，方便收集结果。
 
 ## 2. 手动操作（本机，在 logbook 根目录下）
 

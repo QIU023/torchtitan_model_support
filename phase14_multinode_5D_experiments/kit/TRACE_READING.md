@@ -82,7 +82,7 @@ PyTorch profiler（Kineto）的 trace 到 kernel 级别，但看不到 kernel �
 
 练习：
 1. **eager 的 MFU 为什么低：** 用上表解释 k3_A 的 MFU 只有 5.9%。逐元素 kernel 的时间是 GEMM 的 3 倍，compile 的融合就是针对它；暴露通信 compile 管不到。
-2. **GEMM 跑到峰值的多少：** 在单 rank 原始 trace 里点一个 GEMM，顺着连线找到启动它的 `aten::mm` 或 `aten::addmm`，读 `Input Dims` 得到 M、N、K。用 2·M·N·K ÷ 时长算出 TFLOPS，和 989 比。
+2. **GEMM 跑到峰值的多少**（用 11-08 的 trace；之后的 run 默认不记形状，要做这题就在那一行加 `MN_PROFILE_SHAPES=1`）：在单 rank 原始 trace 里点一个 GEMM，顺着连线找到启动它的 `aten::mm` 或 `aten::addmm`，读 `Input Dims` 得到 M、N、K。用 2·M·N·K ÷ 时长算出 TFLOPS，和 989 比。
 3. **降频的代价：** 在 rank 12 和 rank 13 上各找同一个 GEMM，比时长。再和 `gpu_by_cell.tsv` 里两张卡第 5 步的 SM 频率之比（1980 对约 800 MHz）对照，看两个比例是否接近；不接近的话想想为什么（访存型 kernel 受频率影响小）。
 4. **前向和反向：** 用 `pp_f_ms` 和 `pp_b_ms` 算每个 micro-batch 前向、反向各多久，算出反向 / 前向的比例。它也是模拟文档要校准的量。
 

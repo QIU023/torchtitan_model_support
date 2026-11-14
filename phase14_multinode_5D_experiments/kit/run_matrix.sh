@@ -39,6 +39,9 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   for item in ${extra:-}; do
     case $item in
       nosmoke) [ $STAGE = smoke ] && skip=1 ;;
+      # +optional rows run only when named; other +tags only select rows in the pipeline (MN_ROWS=+tag).
+      +optional) [ "$ONLY" = "  " ] && skip=1 ;;
+      +*) ;;
       MN_FLAVOR=*) flavor=${item#MN_FLAVOR=}; flavor=${flavor//\{mem\}/$MEM} ;;
       MN_SEQ=*) seq=${item#MN_SEQ=} ;;
       # b200 runs the h200 lengths, so it also takes the h200-only variables.
@@ -47,7 +50,7 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
       *) envs+=("$item") ;;
     esac
   done
-  if [ $skip = 1 ]; then note "skip $name (debug model cannot take this layout)"; continue; fi
+  if [ $skip = 1 ]; then note "skip $name (nosmoke at smoke, or +optional and not named)"; continue; fi
   pp=$(echo "$cell" | grep -o 'pp=[0-9]*' | cut -d= -f2)
   pp=${pp:-1}
   case $STAGE in

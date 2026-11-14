@@ -88,6 +88,8 @@ def data(out: Path, dcgm_ips: dict[str, str]) -> dict:
         hw = cell.relative_to(out).parts[0]
         verdict = out / hw / "comm" / "verdict_node0.txt"
         result["comm"] = verdict.read_text()[:4000] if verdict.exists() else ""
+        preflight = out / hw / "preflight" / "VERDICT.txt"
+        result["preflight"] = preflight.read_text()[:4000] if preflight.exists() else ""
     for node, ip in sorted(dcgm_ips.items()):
         gpus = dcgm(ip)
         result["gpus"][node] = {
@@ -118,6 +120,7 @@ canvas{background:#fff;border:1px solid #ddd}.muted{color:#777}
 <h2>Latest step of every rank</h2><div id="ranks"></div>
 <h2>GPUs (DCGM, live)</h2><div id="gpus"></div>
 <h2>Profiler output of this cell</h2><div id="prof"></div>
+<h2>Preflight (preflight/VERDICT.txt)</h2><pre id="preflight"></pre>
 <h2>Communication check (comm/verdict_node0.txt)</h2><pre id="comm"></pre>
 <script>
 function f(v,d){return v==null||isNaN(v)?"-":Number(v).toFixed(d)}
@@ -155,6 +158,7 @@ async function tick(){
   document.getElementById("prof").innerHTML=(t?t+" trace files (measure's profiled step): k8s.sh trace &lt;stage&gt; &lt;row&gt; merges them for ui.perfetto.dev<br>":"no profiler trace in this cell (measure writes one at its profiled step)<br>")+
     (s?s+" memory snapshots: k8s.sh fetch the cell's tt/profiling/memory_snapshot for pytorch.org/memory_viz":"no memory snapshot (probe writes one at step 2)");
   document.getElementById("comm").textContent=d.comm||"";
+  document.getElementById("preflight").textContent=d.preflight||"no preflight verdict yet";
   showLogs(d.logs||{});
 }
 const ERR=/Traceback|Error|error:|OutOfMemory|out of memory|Timeout|timed out|Watchdog|NCCL WARN|exitcode|SIGTERM|Killed/;

@@ -87,7 +87,8 @@ spec:
         # Full study instead: MN_STAGES "smoke probe warm measure", MN_COMM "1", drop MN_SEQ_FORCE (PLAYBOOK.md).
         - name: MN_MODELS
           value: "k3"
-        # Empty runs every matrix row; "k3_A k3_C" only those; "none" only setup and the tokenizers.
+        # Empty runs every matrix row but the +optional ones; "k3_A k3_C" only those; "+core" the rows tagged so (k8s.sh
+        # apply 8 +core); "none" only setup and the tokenizers. The preflight (MN_PREFLIGHT, on unless 0) runs first.
         - name: MN_ROWS
           value: ""
         - name: MN_STAGES

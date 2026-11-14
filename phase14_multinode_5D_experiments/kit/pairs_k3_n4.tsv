@@ -1,0 +1,7 @@
+# a	b	question; a question starting with 噪声 marks the same cell run twice (the noise floor). compare_pairs.py
+k3_A4	k3_A4_rep	噪声：同一格紧接着再跑一次
+k3_A4_ref	k3_A4_ref_v4	29 层、PP 4：VPP 2 对 VPP 4
+k3_A4	k3_A4_v4	61 层、PP 4：VPP 2 对 VPP 4
+k3_A4	k3_A4_compile	eager 对 compile
+k3_A4	k3_5d4	TP 4 对 CP 2 × TP 2（61 层）
+k3_E4_ep8	k3_E4_ep16	256 个专家：EP 8 在节点内，对 EP 16 跨两个节点

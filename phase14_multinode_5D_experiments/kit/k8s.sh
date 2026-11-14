@@ -2,7 +2,8 @@
 # Watch and steer the phase 14 pods, one per node, 2, 4 or 8 of them (nebius/p14_pods.yaml or together/p14_pods.yaml)
 # from your own machine; kubectl must point at the cluster. The pods run the pipeline by themselves (bootstrap.sh,
 # pipeline.py).
-#   k8s.sh apply <2|4|8> [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes
+#   k8s.sh apply <2|4|8> [rows] [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes;
+#                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer)
 #   k8s.sh status              pods, setup, both heartbeats, the last pipeline decisions, REPORT.txt once finished
 #   k8s.sh logs [n]            last n (30) pipeline log lines of both nodes
 #   k8s.sh shell <0|1>         interactive shell in pod 0 or 1
@@ -105,10 +106,14 @@ case "${1:-status}" in
   apply)
     n=${2:?node count: 2, 4 or 8}
     case $n in 2|4|8) ;; *) echo "node count must be 2, 4 or 8" >&2; exit 1 ;; esac
-    manifest=${3:-$HERE/kit/together/p14_pods.yaml}
-    sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" "$manifest" |
-      kubectl apply -f -
-    echo "applied $manifest for $n nodes ($((n * 8)) GPUs); runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
+    rows=${3-__manifest__}
+    manifest=${4:-$HERE/kit/together/p14_pods.yaml}
+    rowsed=()
+    [ "$rows" = __manifest__ ] || rowsed=(-e "/name: MN_ROWS/{n;s/value: .*/value: \"$rows\"/}")
+    sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" \
+      "${rowsed[@]}" "$manifest" | kubectl apply -f -
+    echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'");" \
+      "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
   status)
     kubectl get pods -n "$NS" -l "job-name=$JOB" -o wide
     on "$(any)" "
@@ -120,6 +125,7 @@ case "${1:-status}" in
         for h in \$s/hb/node*; do [ -f \$h ] && echo \"\$(basename \$h): \$(cat \$h)\"; done
         tail -n 6 \$s/log_node0.txt 2>/dev/null
         cat \$s/../comm/verdict_node0.txt 2>/dev/null | head -n 3
+        head -n 12 \$s/../preflight/VERDICT.txt 2>/dev/null
         [ -f \$s/REPORT.txt ] && cat \$s/REPORT.txt
       done; true" ;;
   logs)

@@ -5,7 +5,9 @@ step lines of all ranks and prints one TSV row per cell: exit codes, OOM, steps,
 the peak reserved memory over ranks (and which rank), and the median tps / tflops / mfu / step time over steps after
 --skip (default 3, the compile and warm-up steps), plus the first step's time (startup and compilation included). A
 step's time is the gap between the rank's timestamps of that step line and the one before it ("Training starts" for
-step 1).
+step 1). step_s_clean and mfu_clean are the medians over every step but the first and the profiled ones (multiples
+of the cell's MN_PROFILE), the numbers to compare cells by. ckpt_save_s and ckpt_load_s are the longest checkpoint
+save and load any rank logged (MN_CKPT_STEP).
 """
 
 import argparse
@@ -24,6 +26,8 @@ STEP = re.compile(
 OOM = re.compile(r"OutOfMemoryError|CUDA out of memory")
 TS = re.compile(r"\[titan\] (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),(\d{3})")
 STARTS = "Training starts at step"
+CKPT_SAVE = re.compile(r"Finished (?:saving|staging) the checkpoint in ([\d.]+) seconds")
+CKPT_LOAD = re.compile(r"Finished loading the checkpoint in ([\d.]+) seconds")
 
 
 def cell_rows(cell: Path) -> tuple[list[dict], bool]:
@@ -62,6 +66,22 @@ def cell_rows(cell: Path) -> tuple[list[dict], bool]:
     return rows, oom
 
 
+def profile_freq(cell: Path) -> int:
+    env = cell / "env_node0.txt"
+    text = env.read_text(errors="replace") if env.exists() else ""
+    m = re.search(r"^MN_PROFILE=(\d+)$", text, re.M)
+    return int(m.group(1)) if m else 0
+
+
+def checkpoint_times(cell: Path) -> tuple[float | None, float | None]:
+    save, load = [], []
+    for log in cell.glob("node*.log"):
+        text = log.read_text(errors="replace")
+        save += [float(x) for x in CKPT_SAVE.findall(text)]
+        load += [float(x) for x in CKPT_LOAD.findall(text)]
+    return (max(save) if save else None), (max(load) if load else None)
+
+
 def network(cell: Path) -> str:
     """NCCL's transport from the run's NCCL INFO files (launch.sh): IB+GDR, IB, Socket, or - when not recorded."""
     text = "".join(p.read_text(errors="replace") for p in cell.glob("nccl/*.log"))
@@ -83,9 +103,13 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
     late = [r for r in rows if r["step"] > skip] or rows
     losses = {r["step"]: r["loss"] for r in rows if r["loss"] > 0}
 
-    def median(key: str):
-        values = [r[key] for r in late if r[key] is not None]
+    def median(key: str, pool=None):
+        values = [r[key] for r in (late if pool is None else pool) if r[key] is not None]
         return statistics.median(values) if values else float("nan")
+
+    freq = profile_freq(cell)
+    clean = [r for r in rows if r["step"] >= 2 and not (freq and r["step"] % freq == 0)]
+    ckpt_save, ckpt_load = checkpoint_times(cell)
 
     out.update(
         steps=steps[-1],
@@ -101,6 +125,10 @@ def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
         first_step_s=statistics.median(
             [r["step_s"] for r in rows if r["step"] == steps[0] and r["step_s"] is not None] or [float("nan")]
         ),
+        step_s_clean=median("step_s", clean),
+        mfu_clean=median("mfu", clean),
+        ckpt_save_s=ckpt_save,
+        ckpt_load_s=ckpt_load,
     )
     return out
 
@@ -113,7 +141,8 @@ def main() -> None:
     args = parser.parse_args()
     columns = [
         "cell", "rc", "oom", "steps", "loss_first", "loss_last",
-        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s", "net",
+        "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s",
+        "step_s_clean", "mfu_clean", "ckpt_save_s", "ckpt_load_s", "net",
     ]
     print("\t".join(columns))
     for cell in sorted(p for p in args.stage_dir.iterdir() if p.is_dir()):
@@ -121,7 +150,8 @@ def main() -> None:
             continue
         row = parse_cell(cell, args.nproc, args.skip)
         print("\t".join(
-            f"{row[c]:.4f}" if isinstance(row.get(c), float) else str(row.get(c, "")) for c in columns
+            f"{row[c]:.4f}" if isinstance(row.get(c), float) else "-" if c in row and row[c] is None else str(row.get(c, ""))
+            for c in columns
         ))
 
 

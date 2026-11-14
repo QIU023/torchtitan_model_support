@@ -1,7 +1,8 @@
 """Unattended phase 14 pipeline for 2, 4 or 8 nodes on a shared filesystem; resumes after preemption or restarts.
 
 bootstrap.sh starts it on every node. Tasks run in one order, frozen in $OUT/$HW/pipeline/tasks.json the first
-time node 0 starts: the communication check, the tokenizers, the matrix cells (row by row: smoke, probe, warm,
+time node 0 starts: the preflight (every GPU's GEMM rate and clocks, the quick network check; a failure stops the
+pipeline before the matrix, MN_PREFLIGHT=warn only reports, 0 skips it), the communication check, the tokenizers, the matrix cells (row by row: smoke, probe, warm,
 measure; MN_ORDER=stage runs every row's smoke first, and so on), then one communication run per NCCL variant of
 comm_sweep.tsv (MN_COMM_SWEEP=0 leaves them out). Node 0 decides attempt numbers, retries, probe
 lengths and skips, and records each decision as a file under $OUT/$HW/pipeline/; the other nodes follow those files.
@@ -10,11 +11,12 @@ with its state; a run whose peer (any other node) died or moved on is killed and
 failure. The matrix is matrix_<model>.tsv on 2 nodes and matrix_<model>_n<NNODES>.tsv on 4 or 8. A probe that
 runs out of memory retries at half the length; warm and measure use the length the probe settled on. Probe stores a
 memory snapshot at step 2 (MN_MEMSNAP_PROBE, empty for none); measure writes TensorBoard metrics and a profiler trace;
-at the end node 0 writes the stage summaries, the monitor summary, the NCCL variant comparison and the measure trace
-report.
+at the end node 0 writes the stage summaries, the monitor summary, the NCCL variant comparison, the measure trace
+report and the paired comparison of pairs_<model>[_n<NNODES>].tsv (compare_pairs.py).
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
-MN_ROWS (only these matrix rows), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
+MN_ROWS (only these matrix rows; +<tag> selects the rows a matrix tags so; empty runs every row but the
++optional ones), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
 PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops every node once the current attempt is over.
 """
 
@@ -147,11 +149,13 @@ def matrix_rows(model: str) -> list[dict]:
             continue
         name, cell, s_h100, s_h200, s_a100, extra = (line.split("\t") + [""] * 6)[:6]
         seq = {"h100": s_h100, "h200": s_h200, "b200": s_h200}.get(HW, s_a100)
-        envs, nosmoke = {}, False
+        envs, nosmoke, tags = {}, False, []
         for item in extra.split():
             key = item.split("=", 1)[0]
             if item == "nosmoke":
                 nosmoke = True
+            elif item.startswith("+"):
+                tags.append(item[1:])
             elif ":" in key:
                 tag, kv = item.split(":", 1)
                 if tag == HW or (HW == "b200" and tag == "h200"):
@@ -160,7 +164,7 @@ def matrix_rows(model: str) -> list[dict]:
             elif "=" in item:
                 k, v = item.split("=", 1)
                 envs[k] = v
-        rows.append(dict(name=name, cell=cell, seq=int(seq), envs=envs, nosmoke=nosmoke))
+        rows.append(dict(name=name, cell=cell, seq=int(seq), envs=envs, nosmoke=nosmoke, tags=tags))
     return rows
 
 
@@ -168,11 +172,18 @@ def build_tasks() -> list[dict]:
     models = ENV.get("MN_MODELS", "k3 m3").split()
     stages = ENV.get("MN_STAGES", "smoke probe warm measure").split()
     only = set(ENV.get("MN_ROWS", "").split())
-    tasks = [dict(id="comm", kind="comm")] if ENV.get("MN_COMM", "1") == "1" else []
+
+    def selected(r: dict) -> bool:
+        if not only:
+            return "optional" not in r["tags"]
+        return r["name"] in only or any("+" + tag in only for tag in r["tags"])
+
+    tasks = [dict(id="preflight", kind="preflight")] if ENV.get("MN_PREFLIGHT", "1") != "0" else []
+    tasks += [dict(id="comm", kind="comm")] if ENV.get("MN_COMM", "1") == "1" else []
     if set(stages) & {"probe", "warm", "measure"}:
         tasks += [dict(id=f"assets.{m}", kind="assets", model=m) for m in models]
     for m in models:
-        rows = [r for r in matrix_rows(m) if not only or r["name"] in only]
+        rows = [r for r in matrix_rows(m) if selected(r)]
         cells = [(st, r) for st in stages for r in rows]
         if ENV.get("MN_ORDER", "row") == "row":
             cells.sort(key=lambda c: [r["name"] for r in rows].index(c[1]["name"]))
@@ -286,7 +297,9 @@ def run_attempt(t: dict, idx: int, a: int, seq: int) -> int:
     tid = t["id"]
     env = dict(ENV)
     env["MN_PORT"] = str(MASTER_PORT + 1 + (idx * 16 + a) % 3000)
-    if t["kind"] == "comm":
+    if t["kind"] == "preflight":
+        cmd = ["bash", str(K / "preflight.sh")]
+    elif t["kind"] == "comm":
         env.update(t.get("envs", {}))
         env["MN_COMM_TAG"] = t.get("tag", "")
         cmd = ["bash", str(K / "run_comm.sh")]
@@ -419,6 +432,26 @@ def blocked(t: dict, ids: set) -> str | None:
     return None
 
 
+def preflight_passed() -> bool:
+    """Node 0's verdict on the preflight; a failure stops every node (STOP) unless MN_PREFLIGHT=warn."""
+    with open(S / "preflight_verdict.log", "w") as out:
+        rc = subprocess.call(
+            [sys.executable, str(K / "preflight.py"), "verdict", str(OUT / HW / "preflight"),
+             "--comm", str(OUT / HW / "comm_preflight"), "--nodes", str(NNODES)],
+            stdout=out, stderr=subprocess.STDOUT,
+        )
+    if rc == 0:
+        log("preflight passed")
+        return True
+    if ENV.get("MN_PREFLIGHT", "1") == "warn":
+        log(f"preflight failed (MN_PREFLIGHT=warn, going on): {OUT / HW / 'preflight' / 'VERDICT.txt'}")
+        return True
+    log(f"preflight FAILED, stopping before the matrix: {OUT / HW / 'preflight' / 'VERDICT.txt'}; "
+        "replace the node, then k8s.sh start (the preflight runs again)")
+    write(B / "STOP", "preflight failed")
+    return False
+
+
 def lead(t: dict, idx: int, ids: set) -> None:
     tid = t["id"]
     # An attempt this node announced but never finished was cut off by a restart: mark it aborted for the followers.
@@ -477,6 +510,8 @@ def lead(t: dict, idx: int, ids: set) -> None:
                 archive(t, a, "aborted")
             continue
         if rc0 == 0 and all(rc == 0 for rc in rcs):
+            if t["kind"] == "preflight" and not preflight_passed():
+                return
             if t["kind"] == "cell" and t["stage"] == "probe":
                 write(mark("len", f"{t['model']}.{t['name']}"), str(seq))
             write(mark("done", tid), "ok")
@@ -555,6 +590,14 @@ def finish(tasks: list[dict]) -> None:
             subprocess.call(
                 [sys.executable, str(K / "trace_report.py"), str(OUT / HW / "measure")], stdout=f, stderr=subprocess.STDOUT
             )
+            for m in {t["model"] for t in tasks if t["kind"] == "cell"}:
+                pairs = K / matrix_path(m).name.replace("matrix_", "pairs_")
+                if pairs.exists():
+                    subprocess.call(
+                        [sys.executable, str(K / "compare_pairs.py"), str(OUT / HW / "measure"), str(pairs),
+                         "--out", str(OUT / HW / "measure" / f"pairs_report_{m}.tsv")],
+                        stdout=f, stderr=subprocess.STDOUT,
+                    )
     write(S / "ALL_DONE", time.strftime("%m-%d %H:%M:%S"))
     log("pipeline finished; REPORT.txt, the summaries and the measure trace report are written")
 

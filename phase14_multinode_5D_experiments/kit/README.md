@@ -113,7 +113,9 @@ M3 的 TP 最多 4（index 头跟 KV 组切，KV 组是 4），所以 K3 (D) 那
 | `run_matrix.sh` | 一个模型、一个阶段，跑矩阵的每一行 |
 | `matrix_k3.tsv`、`matrix_m3.tsv` | 两个模型在 2 节点上的组合和每种卡的长度 |
 | `matrix_k3_n4.tsv`、`matrix_k3_n8.tsv` | K3 在 4 节点、8 节点上的组合（`PLAYBOOK.md` 第 0.1、5.1 节） |
-| `summarize.py` | 解析日志，出每格一行的 TSV |
+| `summarize.py` | 解析日志，出每格一行的 TSV；`step_s_clean`、`mfu_clean` 去掉第 1 步和录 trace 的那一步，比较格子时用这两列 |
+| `preflight.py`、`preflight.sh` | 开跑前筛查：每张卡 30 秒 GEMM（算力、频率、温度、降频原因），大消息通信和 RDMA，不过关就停 |
+| `compare_pairs.py`、`pairs_k3*.tsv` | 成对对照：每一对的干净步时间、MFU、差值和噪声底线，留一列写结论 |
 | `trace_report.py`、`merge_traces.py` | 每格 trace 的时间拆分（计算、按进程组的暴露通信、拷贝、空闲，并入 tps、MFU、显存和 IB 速率）；一格所有 rank 合成一份 Perfetto trace |
 | `monitor.py` | 每个节点的 GPU 和 IB 采样器（含温度和降频原因）；`--show` 加 DCGM 看最新一次，`--summary` 按任务汇总 |
 | `dashboard.py` | pod 0 上的实时网页（`k8s.sh dash`）：每步 MFU / tps / 步时间、每个 rank 的最新一步、DCGM、每个节点的日志 |

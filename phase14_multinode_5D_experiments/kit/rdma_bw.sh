@@ -2,14 +2,14 @@
 # Raw RDMA write bandwidth of every active InfiniBand port between the two nodes, without NCCL: perftest's
 # ib_write_bw in host memory, node 1 writing to node 0, one port after the other (port k of node 1 to port k of node 0).
 # run_comm.sh calls it on both nodes at once before the NCCL measurement; node 0 serves, node 1 connects to MASTER_ADDR.
-# Node 1 writes one line per port to $OUT/$HW/comm/rdma_node1.txt; the raw output is in rdma_<hca>_node<k>.log.
+# Node 1 writes one line per port to rdma_node1.txt in MN_COMM_DIR ($OUT/$HW/comm); the raw output is in rdma_<hca>_node<k>.log.
 . "$(dirname "$0")/env.sh"
 set -u
 command -v ib_write_bw > /dev/null || { echo "ib_write_bw not installed (perftest), skipped"; exit 0; }
 # Nodes 0 and 1 stand for every pair: with more nodes, the others would contend for node 0's server ports.
 [ "$NODE_RANK" -le 1 ] || { echo "node $NODE_RANK: the RDMA check runs between nodes 0 and 1 only"; exit 0; }
 : "${MASTER_ADDR:?set MASTER_ADDR to the address of node 0}"
-R=$OUT/$HW/comm
+R=${MN_COMM_DIR:-$OUT/$HW/comm}
 mkdir -p $R
 out=$R/rdma_node$NODE_RANK.txt
 : > $out

@@ -2,18 +2,23 @@
 # 8 nodes x 8 GPUs. Default flavor k3_64x{mem}: K3's 93 layers (full attention on every fourth and the last),
 # 128 experts, attention-residual blocks of 12.
 # MN_FLAVOR picks another flavor ({mem}: 80g or 141g by hardware); MN_SEQ pins the row's length over MN_SEQ_FORCE.
+# +core marks the rows only 8 nodes answer (k8s.sh apply 8 +core runs just those, about 50 minutes).
 # Every row keeps 524288 tokens per step and data parallelism 2 (or 1); the extra GPUs go to PP across nodes and
 # to a bigger model, while TP, CP and EP stay inside a node unless the row says otherwise.
 # The 11-08 model on four times the GPUs: PP 8 (29 layers allow at most 2 virtual stages per rank).
-k3_A8_ref	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem}
+k3_A8_ref	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_16x{mem} +core
 # The 93-layer model: PP across the eight nodes; 4 virtual stages per rank is K3's 32-stage pipeline.
-k3_A8	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4
-k3_A8_v2	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	
+k3_A8	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4 +core
+# The same cell again right after: its difference is the noise floor of every pair.
+k3_A8_rep	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4 +core
+k3_A8_v2	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	+core
 k3_5d8	pp=8,dp=2,cp=2,tp=2,ep=8	16384	16384	16384	MN_VPP=4
 k3_C8	pp=8,dp=2,cp=4,ep=8	16384	16384	16384	MN_VPP=4
 k3_D8	pp=8,cp=4,tp=2,ep=8	16384	16384	16384	MN_VPP=4
 # Four times the experts instead: EP 8 inside a node against EP 16 across two nodes.
-k3_E8_ep8	pp=4,dp=2,cp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512
-k3_E8_ep16	pp=4,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512
+k3_E8_ep8	pp=4,dp=2,cp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512 +core
+k3_E8_ep16	pp=4,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512 +core
 # Long context: CP 8 x TP 4 spans four nodes, no PP, two sequences of 128K per step.
-k3_L8	dp=2,cp=8,tp=4,ep=8	131072	131072	131072	MN_SEQ=131072 MN_FSDP_KEEP=1
+k3_L8	dp=2,cp=8,tp=4,ep=8	131072	131072	131072	MN_SEQ=131072 MN_FSDP_KEEP=1 +core
+# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume).
+k3_A8_compile	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4 MN_COMPILE=1

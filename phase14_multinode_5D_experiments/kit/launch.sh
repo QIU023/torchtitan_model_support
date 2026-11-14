@@ -19,6 +19,9 @@ cd $T
 { env | grep -E '^(MN_|HW=|NCCL_|UCX_|SHARP_|GLOO_|NODE_RANK=|MASTER_ADDR=)' | sort; echo "ulimit_l=$(ulimit -l)"; } \
   > $D/env_node$NODE_RANK.txt
 git -C $T rev-parse HEAD > $D/tree.txt
+# A checkpoint drill (MN_CKPT_STEP) keeps its checkpoint outside the run directory, which a retry archives, so the
+# rerun after a kill resumes from it.
+[ -z "${MN_CKPT_STEP:-}" ] || export MN_CKPT_DIR=${MN_CKPT_DIR:-$OUT/$HW/ckpt/$(basename $D)}
 # NCCL's transport choice (IB or sockets, GPUDirect RDMA) goes to per-process files beside the logs, so every run
 # checks the network without a separate test (summarize.py reads them); MN_NCCL_INFO=0 turns it off.
 NCCL_LOG=()

@@ -13,7 +13,10 @@ mkdir -p $R
 L=$R/comm_node$NODE_RANK.log
 ulimit -l unlimited 2>/dev/null || true
 . $V/bin/activate
-[ -n "${MN_COMM_TAG:-}" ] || bash $K/rdma_bw.sh > $R/rdma_run_node$NODE_RANK.log 2>&1
+# The raw RDMA test runs with NCCL's own choices, and in any run that asks for it (MN_COMM_RDMA=1, the preflight).
+if [ -z "${MN_COMM_TAG:-}" ] || [ "${MN_COMM_RDMA:-0}" = 1 ]; then
+  MN_COMM_DIR=$R bash $K/rdma_bw.sh > $R/rdma_run_node$NODE_RANK.log 2>&1
+fi
 NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,ENV,TUNING timeout ${MN_TIMEOUT:-1800} \
   torchrun --nnodes=$NNODES --nproc_per_node=$NPROC --node_rank=$NODE_RANK \
   --master_addr=$MASTER_ADDR --master_port=${MN_PORT:-$((MASTER_PORT + 900))} \

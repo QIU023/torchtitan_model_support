@@ -7,7 +7,7 @@ process group through the record_param_comms op that launched it; unattributed_p
 that found none. An NCCL kernel's time includes waiting for its peers, so exposed communication also holds load
 imbalance and pipeline bubbles, and eff_busbw (message bytes over kernel time, nccl-tests factors) is a lower bound.
 Writes trace_report.tsv (one row per cell, joined with summarize.py's tps / mfu / peak memory and monitor.py's
-InfiniBand rates), trace_report_pg.tsv (per cell, process group and collective), trace_report_rank.tsv (per cell
+InfiniBand rates, and the straggler gap: the most compute time any rank spent, less the median over ranks), trace_report_pg.tsv (per cell, process group and collective), trace_report_rank.tsv (per cell
 and rank), trace_report_groups.tsv (each process group's hashed name, as Perfetto shows it on an NCCL kernel, with
 its label and member ranks), trace_report_kernels.tsv (per cell and rank: kernel time by family, the compute stream's
 kernel count and sizes, and the GPU time of the pipeline schedule's forward and backward actions) and
@@ -21,6 +21,7 @@ import gzip
 import json
 import os
 import re
+import statistics
 import sys
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
@@ -44,7 +45,7 @@ NEAR_US = 5000  # a launch this soon after a record_param_comms op (same thread)
 CELL_COLUMNS = [
     "cell", "ranks", "step_ms", "tps", "mfu", "peak_mem_gib", "peak_rank", "compute_pct", "exposed_pct",
     "exposed_max_pct", "idle_pct", "idle_max_pct", "copy_pct", "overlap_pct", "unattributed_pct", "top_exposed",
-    "ib_tx_GBps", "ib_rx_GBps",
+    "ib_tx_GBps", "ib_rx_GBps", "straggler_ms", "straggler_rank",
 ]
 PG_COLUMNS = [
     "cell", "label", "group", "collective", "group_size", "kernels", "kernel_ms", "exposed_ms", "exposed_pct",
@@ -388,6 +389,7 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
     for key, m in merged.items():
         by_label[key[0]] += m[3] / n
     top = sorted(by_label.items(), key=lambda kv: -kv[1])[:3]
+    slowest = max(ranks, key=lambda r: r["acc"]["compute"])
     row = dict(
         cell=cell.name,
         ranks=n,
@@ -401,6 +403,8 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
         overlap_pct=100 * (1 - sum(r["acc"]["exposed"] for r in ranks) / comm_total) if comm_total else None,
         unattributed_pct=100 * sum(r["unattributed"] for r in ranks) / nccl_total if nccl_total else None,
         top_exposed=", ".join(f"{label} {100 * us / mean_window:.1f}%" for label, us in top if us > 0) or "-",
+        straggler_ms=(slowest["acc"]["compute"] - statistics.median(r["acc"]["compute"] for r in ranks)) / 1e3,
+        straggler_rank=slowest["rank"],
     )
     row.update(extra)
     pg_rows = []
