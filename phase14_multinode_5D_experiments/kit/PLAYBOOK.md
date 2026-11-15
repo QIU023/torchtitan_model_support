@@ -292,7 +292,7 @@ bash $K8S scope                                           # 不带参数：撤�
 - 任何 `NCCL_*` 变量（第 7.4 节）；
 - `MN_FLAVOR=k3_<卡数>x{mem}[_e<专家数>]`：这一行换一个 flavor，`{mem}` 按卡型换成 `80g` 或 `141g`；
 - `MN_SEQ=<n>`：固定这一行的长度，`MN_SEQ_FORCE` 不覆盖它（长上下文的行用）；
-- `MN_COMPILE=1`：这一行开 compile（清单默认 0）；
+- `MN_COMPILE=1`：这一行开 compile（清单默认 0）。同时加 `MN_NCCL_INIT_TIMEOUT=1800`：冷编译在第 1 步里可能超过 300 秒，先编完的 rank 会在第一个 collective 上等到超时（8 月在 GB200 上冷编译 KDA 约 7 分钟就撞过）。手动给别的行开 compile：`bash $K8S cell measure <行> MN_COMPILE=1 MN_NCCL_INIT_TIMEOUT=1800`；
 - `MN_PROFILE_SHAPES=1`：trace 里记算子的输入形状（默认不记，录 trace 那一步拖慢得少一些）；
 - `+<标签>`：给这一行打标签，`MN_ROWS=+<标签>` 选出所有带它的行；`+optional` 的行只有被点名（行名或标签）时才跑；
 - `h200:VAR=值`：只在这种卡上生效；

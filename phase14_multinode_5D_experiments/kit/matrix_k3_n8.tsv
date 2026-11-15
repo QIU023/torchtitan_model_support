@@ -20,5 +20,5 @@ k3_E8_ep8	pp=4,dp=2,cp=2,tp=4,ep=8	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512 
 k3_E8_ep16	pp=4,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_64x{mem}_e512 +core
 # Long context: CP 8 x TP 4 spans four nodes, no PP, two sequences of 128K per step.
 k3_L8	dp=2,cp=8,tp=4,ep=8	131072	131072	131072	MN_SEQ=131072 MN_FSDP_KEEP=1 +core
-# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume).
-k3_A8_compile	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4 MN_COMPILE=1
+# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume); a cold compile in step 1 can outlast the 300 s first-step NCCL timeout, hence 1800 s.
+k3_A8_compile	pp=8,dp=2,tp=4,ep=8	16384	16384	16384	MN_VPP=4 MN_COMPILE=1 MN_NCCL_INIT_TIMEOUT=1800
