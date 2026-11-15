@@ -10,6 +10,89 @@
 
 下面的练习都用 11-08 的数据（`../results/20261108_h100_together/`，`raw/` 只在本机），先 `export PYTHONUTF8=1`。
 
+## 第一次打开：按这个顺序走一遍（约 30 分钟，k3_A）
+
+**准备一个小文件。** 16 个 rank 的合成文件有 142 MB，加载慢。先只合 4 个 rank，约 36 MB：
+- rank 0：node 0，stage 0；
+- rank 8：node 1，stage 1；
+- rank 12：node 1，正常卡；
+- rank 13：node 1，降频卡。
+
+```sh
+cd phase14_multinode_5D_experiments
+export PYTHONUTF8=1
+python kit/merge_traces.py results/20261108_h100_together/raw/h100/manual/measure/k3_A_1108_170956 \
+  --ranks 0,8,12,13 --out results/20261108_h100_together/k3_A_r0_8_12_13.json.gz
+```
+
+**第 1 步，先用 SQL 拿账，再去看时间线。** 在 https://ui.perfetto.dev 打开文件后，左边点 "Query (SQL)"，把查询贴进去，按 Ctrl+Enter。下面四条在 Perfetto v59 上跑通过，k3_A 的结果附在后面：
+
+```sql
+-- 1. 每个 rank 耗时最多的 kernel
+select p.name as rank, s.name as kernel, count(*) as n, round(sum(s.dur) / 1e6, 1) as ms
+from slice s join thread_track tt on s.track_id = tt.id join thread t using(utid) join process p using(upid)
+where s.category = 'kernel'
+group by p.name, s.name order by ms desc limit 20;
+
+-- 2. 同一个 GEMM 在两张卡上各多快（改 p.name 比任意两个 rank）
+select p.name as rank, count(*) as n, round(avg(s.dur) / 1e3, 1) as mean_us, round(sum(s.dur) / 1e6, 1) as ms
+from slice s join thread_track tt on s.track_id = tt.id join thread t using(utid) join process p using(upid)
+where s.name like '%cutlass%' and p.name in ('rank 12, node 1', 'rank 13, node 1')
+group by p.name;
+
+-- 3. 一个 rank 的 NCCL 时间按 collective 分
+select p.name as rank, extract_arg(s.arg_set_id, 'args.Collective name') as collective,
+       count(*) as n, round(sum(s.dur) / 1e6, 1) as ms
+from slice s join thread_track tt on s.track_id = tt.id join thread t using(utid) join process p using(upid)
+where s.name like 'nccl%' and p.name = 'rank 12, node 1'
+group by 1, 2 order by ms desc;
+
+-- 4. PP 每个虚拟 stage 的前向、反向合计（16 个 micro-batch）
+select p.name as rank, substr(s.name, 1, 5) as action, count(*) as n, round(sum(s.dur) / 1e6, 1) as ms
+from slice s join thread_track tt on s.track_id = tt.id join thread t using(utid) join process p using(upid)
+where s.category = 'gpu_user_annotation' and s.name glob 'PP:[0-9][FB][0-9]*'
+group by 1, 2 order by 1, 2;
+```
+
+k3_A 上的结果：
+
+| 查询 | 结果 | 说明 |
+|---|---|---|
+| 1 | rank 0 的 `SendRecv` 18.5 秒，rank 8 6.6 秒，rank 12 3.8 秒，rank 13 2.3 秒 | 同一种 kernel，越不慢的卡花的时间越多：kernel 时长里大部分是在等 |
+| 2 | 同一个 cutlass GEMM：rank 12 平均 98.9 微秒，rank 13 223.3 微秒 | rank 13 慢 2.3 倍，就是降频 |
+| 3 | rank 12：`all_to_all` 2.6 秒，`allGatherSingleImpl` 2.5 秒，`reduceScatterSingleImpl` 1.9 秒，`recv` 1.2 秒 | EP 和 TP 的时间比 PP 的 recv 还多 |
+| 4 | 每个 micro-batch 的反向：stage 0 约 172 毫秒，stage 1 约 335 毫秒 | node 1 的反向是 node 0 的两倍，正常卡 rank 8 也是如此 |
+
+**第 2 步，带着账里的问题去时间线上找证据。**
+- **慢卡：**
+  - 把 rank 12 和 rank 13 的 `stream 7` 钉在一起（轨道名旁边的图钉），找同一个 `PP:1F3` 区间；
+  - rank 13 上每个 kernel 都更长；
+  - 再看 EP 的 `all_to_all`：rank 12 开始得早、结束得和 rank 13 一样晚，多出来的就是在等。
+- **等待链：** 第 1 条说 rank 0 在 `SendRecv` 上花了 18.5 秒。在 rank 0 上找很长的 `PP:0RECV_B*`，那是 stage 0 在等 stage 1 把反向的梯度发回来。
+  - 假设：rank 13 慢 → node 1 整个 EP 组等它 → stage 1 的反向变慢（第 4 条）→ stage 0 等 stage 1；
+  - 这只是假设，现有数据分不开，要在没有慢卡的节点上重测，看这条链断不断。
+- **eager 的开销：** 在 `stream 7` 上放大到一个 `PP:1F3`，能看到几千个很短的逐元素 kernel，例如 `MulFunctor<float>`。这一类加起来的时间是 GEMM 的 3 倍（`measure_trace_report_kernels.tsv`）。
+
+**第 3 步，写账。** 把计算、各维度的暴露通信、空闲凑成一步的时间（`measure_trace_report.tsv`），写下"慢卡、eager、暴露通信"各像占多少，并标明哪些只是假设。
+
+## 从 trace 到调优：每个发现对应一个旋钮、一对 run
+
+调优就是重复这一个循环：
+1. 在 trace 里看到一个现象，写下推断；
+2. 只改一个旋钮，和原来那格成对跑；
+3. 看成对对照表的差值有没有超出噪声底线（`pairs_report_k3.tsv`）；
+4. 再回 trace，确认现象是不是按预期变了，写一句结论。
+
+| trace 里的现象 | 推断 | 旋钮 | 成对的行 | 验证时看什么 |
+|---|---|---|---|---|
+| 同一个 GEMM，一张卡慢 2.3 倍 | 硬件降频 | 换卡（开跑前筛查） | 健康节点上的 `k3_A` 对 11-08 的 `k3_A` | `straggler_ms` 接近 0；其他 rank 的 `SendRecv` 时间下降 |
+| 计算流上一半 kernel 短于 10 微秒，逐元素时间是 GEMM 的 3 倍 | eager 的开销 | `MN_COMPILE=1` | `k3_A` 对 `k3_A_compile` | `aten_ms` 和 kernel 数下降、`triton_ms` 上升、步时间下降；暴露通信的占比会上升 |
+| PP `recv` 很长，暴露 25% 对理论气泡 3% | 在等另一个 stage | 先换卡；还长就 VPP 4，或让最后一个 stage 少放几层 | 32 卡的 `k3_A4_ref` 对 `k3_A4_ref_v4` | PP 的暴露下降；`PP:<s>B` 在两个 stage 之间更均衡 |
+| node 1 的反向是 node 0 的两倍 | stage 不均（最后一个 stage 有输出层和 loss），或在等慢卡 | 先换卡；仍不均，就调最后一个 stage 的层数（titan 的 `pipeline_parallel_last_stage_less_layers`，recipe 还没有这个开关） | 换卡前后的 `k3_A` | 第 4 条查询里两个 stage 的反向时间 |
+| EP `all_to_all` 只有 48 GB/s，各 rank 开始时间不齐 | 在等最慢的 rank，或路由不均 | 先换卡；仍不齐就看每个专家分到的 token 数 | 换卡前后的 `k3_A` | `all_to_all` 时长、各 rank 开始时间的差 |
+| k3_B：每步 1024 次参数 all-gather、1248 次 fp32 reduce-scatter，都跨节点 | 每个 micro-batch 都重新 gather 参数、归约梯度 | `MN_FSDP_KEEP=1` | `k3_B` 对 `k3_B_keep` | FSDP 和专家 FSDP 的暴露下降 |
+| TP 暴露 8% | TP 4 每层都要 all-gather 和 reduce-scatter | 换成 CP 2 × TP 2 | `k3_A` 对 `k3_5d` | TP 的暴露下降，CP 的上升，看哪边划算 |
+
 ## 0. trace 里有什么、没有什么
 
 PyTorch profiler（Kineto）的 trace 到 kernel 级别，但看不到 kernel 内部：
