@@ -57,7 +57,7 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
   - 它的 `eff_busbw` 只有 0.38 GB/s，说明这段时间几乎都是在等对面的 stage 把激活发过来（含流水线气泡），不是带宽不够。
 - **EP：** 13.3%。
   - 每步 1120 次 all-to-all，组在节点内（NVLink）；
-  - `eff_busbw` 48 GB/s，远低于节点内 alltoall 实测的 330 GB/s，说明 kernel 时间里大部分是等最慢的那个 rank，或者路由不均。
+  - `eff_busbw` 48 GB/s，远低于节点内 alltoall 实测的 330 GB/s。这个数混进了只交换 token 数、几乎全在等的小 all-to-all，按消息大小拆开后的读法见第 8 节：真正搬数据的那档，不算等待时 284 GB/s，有一半时间在等。
 - **TP：** 8.1%，是序列并行的 all-gather 和 reduce-scatter，节点内 `eff_busbw` 70 到 82 GB/s。
 
 ### 3.2 `k3_B`：没有 PP，FSDP 跨节点
@@ -118,6 +118,8 @@ trace 里第 5 步 GPU 时间的拆分（16 个 rank 的平均，`measure_trace_
 | `measure_trace_report_rank.tsv` | 每格、每个 rank 一行：计算、暴露通信、拷贝、空闲、通信总时间 |
 | `measure_trace_report_kernels.tsv` | 每格、每个 rank 的 kernel 时间按类分，计算流上 kernel 的个数和大小，PP 前向、反向动作的 GPU 时间（读法见 `../../kit/TRACE_READING.md`） |
 | `measure_trace_report_topk.tsv` | 每格耗时最多的 20 个 kernel |
+| `measure_trace_report_comm.tsv` | 每格、每种 collective、每档消息大小一行：训练里的时长、不算等待的时长、等待占比、各 rank 开始时间的差、两种 busbw（第 8 节） |
+| `measure_trace_report_replay.json` | 回放清单：每格最耗时的 30 种 collective，带成员 rank 和消息大小，`k8s.sh replay` 在集群上单独跑它们 |
 | `measure_pairs_report.tsv` | 成对对照（`../../kit/pairs_k3.tsv`）：11-08 只跑了四格，多数对缺一边；`k3_5d` 是 4096 那次，和 16K 的格子长度不同，不给差值 |
 | `measure_trace_report_groups.tsv` | 每格每个进程组的哈希名、标签和成员 rank：Perfetto 里点 NCCL kernel 看到的 `Process Group Name` 在这里查 |
 | `gpu_by_cell.tsv` | 每格、每张卡：平均利用率、功耗、最高温度、SM 频率、降频采样占比（从 `monitor.py` 的 2 秒采样按每格的训练时间段切出来） |
@@ -235,7 +237,30 @@ python kit/merge_traces.py $M/k3_A_1108_170956 --ranks 5,12,13 --out $R/k3_A_r5_
 - 一张降频的卡影响了全部四格（第 3.5 节）。
 - MFU 是 titan 的口径：(6 × 激活参数 + 注意力算子 FLOPs) × tps ÷ 989 TFLOPS（H100 bf16 稠密峰值）。
 
-## 8. MFU 差距拆分（待填）
+## 8. 通信：网络慢还是在等
+
+来自 `measure_trace_report_comm.tsv`。"不算等待"是同一次调用里最快那个 rank 的时长：最后到的 rank 不用等，所以它约等于纯传输时间。
+
+| 格子 | collective（组） | 每个 rank 每步 | 等待占比 | 不算等待的 busbw | 对照 |
+|---|---|---|---|---|---|
+| `k3_A` | EP all-to-all，151 MB（节点内 8 卡） | 882 次，2.2 秒 | 51% | 284 GB/s | 节点内 8 卡 alltoall 微基准在 256 MB 时 306 GB/s |
+| `k3_A` | EP 交换 token 数的小 all-to-all（128 个数） | 224 次，0.37 秒 | 99% | - | 纯等待：各 rank 在每层都在这里对齐 |
+| `k3_A` | TP all-gather，75.5 MB（节点内 4 卡） | 936 次，0.76 秒 | 28% | 271 GB/s | - |
+| `k3_B` | 专家 FSDP reduce-scatter，fp32，212 MB（跨节点 2 卡） | 448 次，7.8 秒 | 49% | 34 GB/s | 一张 400G 网卡 50 GB/s；跨节点 sendrecv 微基准 43 GB/s |
+| `k3_B` | 专家 FSDP all-gather，bf16，106 MB（跨节点 2 卡） | 896 次，2.1 秒 | 4% | 35 GB/s | 同上 |
+| `k3_B` | FSDP all-gather，bf16，73 MB（跨节点 8 卡） | 640 次，4.4 秒 | 79% | 117 GB/s | - |
+
+读法：
+- **节点内：** 不算等待时，通信能跑到微基准的八到九成，时间大多花在等上（慢卡、路由不均、各 rank 进度不一）。在 NCCL 这一层改不出东西。
+- **真正卡在跨节点网络上的，只有 `k3_B` 的专家 FSDP：**
+  - 每个 rank 每步 448 次 reduce-scatter 加 896 次 all-gather，不算等待时 34 到 35 GB/s，约为网卡线速的 70%；
+  - 在 NCCL 这一层调到线速，这两种操作最多快约 30%；
+  - `MN_FSDP_KEEP=1` 则把它们减成每步一次，所以先跑 `k3_B` 对 `k3_B_keep` 那一对。
+- 第 3.1 节"EP all-to-all 48 GB/s"那个数，是 1120 次 all-to-all 的总字节除以总时长，其中混进了那个只传 token 数、几乎全在等的小 all-to-all。按消息大小拆开后，151 MB 那档的中位数是 139 GB/s，不算等待是 284 GB/s。
+
+下一步要在集群上核对：`bash $K8S replay measure k3_B`，看单独跑时专家 FSDP 的 reduce-scatter 是不是也只有 34 GB/s。如果单独跑更快，说明训练时有干扰。
+
+## 9. MFU 差距拆分（待填）
 
 纸面估计约 14%（`../../multinode.md` §0.2：(A) 在 8K 13.6%，32K 14.4%），实测 5.9%。差距靠三组成对的 run 拆开，每一项都是两次 run 的差，不是推算：
 
@@ -246,7 +271,7 @@ python kit/merge_traces.py $M/k3_A_1108_170956 --ranks 5,12,13 --out $R/k3_A_r5_
 | 暴露通信和气泡 | 编译后、没有慢卡的那次 `k3_A` 的 trace 拆分 | 待测 |
 | 噪声底线 | `k3_A` 对 `k3_A_rep` | 待测 |
 
-## 9. 下一轮
+## 10. 下一轮
 
 - 按 `../../kit/PLAYBOOK.md` 第 0 节的快速路径跑整个矩阵。开跑前的筛查会自动挡掉降频的卡；重复行、compile 行、5D 全开 16K 都已经在矩阵里，收尾自动出成对对照表 `pairs_report_k3.tsv`。
 - `k3_B` 和 `k3_B_keep` 对照，看 FSDP 跨节点时每个 micro-batch 重新 gather 的代价。

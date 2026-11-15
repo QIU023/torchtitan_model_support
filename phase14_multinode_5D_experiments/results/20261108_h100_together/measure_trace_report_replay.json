@@ -1,0 +1,4578 @@
+{
+ "k3_A_1108_170956": {
+  "world": 16,
+  "degrees": {
+   "pp": 2,
+   "dpr": 1,
+   "dp": 2,
+   "cp": 1,
+   "tp": 4,
+   "ep": 8
+  },
+  "ops": [
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 9437184,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 96.0,
+    "train_us": 1119.47,
+    "nowait_us": null
+   },
+   {
+    "label": "EP",
+    "collective": "all_to_all",
+    "in_nelems": 75497472,
+    "out_nelems": 75497472,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 882.0,
+    "train_us": 950.7570000000001,
+    "nowait_us": 464.47
+   },
+   {
+    "label": "TP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 9437184,
+    "out_nelems": 37748736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 936.0,
+    "train_us": 290.22900000000004,
+    "nowait_us": 208.80149999999998
+   },
+   {
+    "label": "TP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 37748736,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 936.0,
+    "train_us": 220.54000000000002,
+    "nowait_us": 208.3895
+   },
+   {
+    "label": "EP",
+    "collective": "all_to_all",
+    "in_nelems": 128,
+    "out_nelems": 128,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 224.0,
+    "train_us": 755.169,
+    "nowait_us": 6.2075
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 94374144,
+    "out_nelems": 47187072,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 8.5,
+    "train_us": 2375.9755,
+    "nowait_us": 758.8235
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2048,
+    "out_nelems": 2048,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 192.0,
+    "train_us": 60.5285,
+    "nowait_us": 15.902000000000001
+   },
+   {
+    "label": "PP",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 93401.788,
+    "nowait_us": 6.976
+   },
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 18874368,
+    "out_nelems": 18874368,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 96.0,
+    "train_us": 863.296,
+    "nowait_us": null
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 37748736,
+    "out_nelems": 37748736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 358.014,
+    "nowait_us": 354.3855
+   },
+   {
+    "label": "EP",
+    "collective": "all_to_all",
+    "in_nelems": 77401728,
+    "out_nelems": 77401728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 14.0,
+    "train_us": 700.7375,
+    "nowait_us": 426.01300000000003
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1024,
+    "out_nelems": 1024,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 72.0,
+    "train_us": 14.3835,
+    "nowait_us": 8.7365
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 47187072,
+    "out_nelems": 94374144,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 17.0,
+    "train_us": 487.8885,
+    "nowait_us": 472.3035
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 95.0,
+    "train_us": 11.871500000000001,
+    "nowait_us": 10.0155
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 8304544,
+    "out_nelems": 16609088,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 524.162,
+    "nowait_us": 83.03999999999999
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 2,
+    "out_nelems": 2,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 307.2895,
+    "nowait_us": 114.75200000000001
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 21195016,
+    "out_nelems": 10597508,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 203.185,
+    "nowait_us": 198.5445
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 10597508,
+    "out_nelems": 21195016,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 501.185,
+    "nowait_us": 141.36
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 35.536,
+    "nowait_us": 10.816500000000001
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 294912,
+    "out_nelems": 294912,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 24.5,
+    "train_us": 21.4725,
+    "nowait_us": 18.993000000000002
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2654208,
+    "out_nelems": 2654208,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 28.0,
+    "train_us": 81.0245,
+    "nowait_us": 80.032
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 389,
+    "out_nelems": 389,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 3548.1180000000004,
+    "nowait_us": 9.2325
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 16609088,
+    "out_nelems": 8304544,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 165.42950000000002,
+    "nowait_us": 159.76
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 2304,
+    "out_nelems": 1152,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 2492.1955,
+    "nowait_us": 11.471499999999999
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 31066504,
+    "out_nelems": 15533252,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 2160.39,
+    "nowait_us": 274.513
+   },
+   {
+    "label": "EP",
+    "collective": "all_reduce",
+    "in_nelems": 28,
+    "out_nelems": 28,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 455.6145,
+    "nowait_us": 22.656
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1792000,
+    "out_nelems": 1792000,
+    "dtype": "Int",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 504.84749999999997,
+    "nowait_us": 56.9135
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 128,
+    "out_nelems": 128,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.5,
+    "train_us": 9.7285,
+    "nowait_us": 8.064
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1179648,
+    "out_nelems": 1179648,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 69.4885,
+    "nowait_us": 45.7435
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 1792000,
+    "out_nelems": 1792000,
+    "dtype": "Int",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 581.9925000000001,
+    "nowait_us": 44.688
+   }
+  ]
+ },
+ "k3_B_1108_171837": {
+  "world": 16,
+  "degrees": {
+   "pp": 1,
+   "dpr": 1,
+   "dp": 2,
+   "cp": 4,
+   "tp": 2,
+   "ep": 8
+  },
+  "ops": [
+   {
+    "label": "EFSDP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 53084160,
+    "out_nelems": 26542080,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 448.0,
+    "train_us": 6078.8345,
+    "nowait_us": 3079.6760000000004
+   },
+   {
+    "label": "CPxTP/EP",
+    "collective": "all_to_all",
+    "in_nelems": 37748736,
+    "out_nelems": 37748736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1792.0,
+    "train_us": 621.528,
+    "nowait_us": 212.097
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 4562466,
+    "out_nelems": 36499728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 640.0,
+    "train_us": 2639.062,
+    "nowait_us": 547.6645
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 36499728,
+    "out_nelems": 4562466,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 320.0,
+    "train_us": 8179.986,
+    "nowait_us": 781.669
+   },
+   {
+    "label": "EFSDP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 26542080,
+    "out_nelems": 53084160,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 896.0,
+    "train_us": 1572.4615,
+    "nowait_us": 1508.4065
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 3231592,
+    "out_nelems": 25852736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 256.0,
+    "train_us": 1857.7134999999998,
+    "nowait_us": 300.75300000000004
+   },
+   {
+    "label": "TP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 9437184,
+    "out_nelems": 4718592,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1872.0,
+    "train_us": 64.928,
+    "nowait_us": 59.168
+   },
+   {
+    "label": "TP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 4718592,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1872.0,
+    "train_us": 68.192,
+    "nowait_us": 59.84
+   },
+   {
+    "label": "CPxTP/EP",
+    "collective": "all_to_all",
+    "in_nelems": 128,
+    "out_nelems": 128,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 448.0,
+    "train_us": 1747.9005,
+    "nowait_us": 5.968
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 25852736,
+    "out_nelems": 3231592,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 7117.2105,
+    "nowait_us": 611.4735000000001
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 1048576,
+    "out_nelems": 4194304,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 672.0,
+    "train_us": 443.474,
+    "nowait_us": 67.136
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 23593248,
+    "out_nelems": 188745984,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 80.0,
+    "train_us": 2831.2855,
+    "nowait_us": 1717.4679999999998
+   },
+   {
+    "label": "CP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 147456,
+    "out_nelems": 36864,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 336.0,
+    "train_us": 51.056,
+    "nowait_us": 7.84
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 36864,
+    "out_nelems": 147456,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 336.0,
+    "train_us": 271.153,
+    "nowait_us": 8.704
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 188743680,
+    "out_nelems": 23592960,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 4408.714,
+    "nowait_us": 3414.2815
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 20736,
+    "out_nelems": 2592,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 19127.0615,
+    "nowait_us": 28.0485
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 61840272,
+    "out_nelems": 7730034,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 20673.447,
+    "nowait_us": 1150.9434999999999
+   },
+   {
+    "label": "CP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 1048576,
+    "out_nelems": 262144,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 1030.717,
+    "nowait_us": 37.056
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 294912,
+    "out_nelems": 294912,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 784.0,
+    "train_us": 16.256,
+    "nowait_us": 14.816500000000001
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 55.439499999999995,
+    "nowait_us": 6.5435
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1024,
+    "out_nelems": 1024,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 144.0,
+    "train_us": 6.08,
+    "nowait_us": 5.12
+   },
+   {
+    "label": "CP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 6342.3325,
+    "nowait_us": 13.6325
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 2800.0,
+    "train_us": 8.608,
+    "nowait_us": 7.712
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 786432,
+    "out_nelems": 3145728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 386.9925,
+    "nowait_us": 42.432
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 9437184,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 97.26400000000001,
+    "nowait_us": 86.976
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 2592,
+    "out_nelems": 20736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 175.05700000000002,
+    "nowait_us": 18.543999999999997
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2654208,
+    "out_nelems": 2654208,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 896.0,
+    "train_us": 57.184,
+    "nowait_us": 55.264
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 512,
+    "out_nelems": 512,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 512.0,
+    "train_us": 9.808499999999999,
+    "nowait_us": 7.328
+   },
+   {
+    "label": "FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 7730034,
+    "out_nelems": 61840272,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 1088.8605,
+    "nowait_us": 951.3389999999999
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1179648,
+    "out_nelems": 1179648,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 45.36,
+    "nowait_us": 41.152
+   }
+  ]
+ },
+ "k3_C_1108_172528": {
+  "world": 16,
+  "degrees": {
+   "pp": 2,
+   "dpr": 1,
+   "dp": 2,
+   "cp": 4,
+   "tp": 1,
+   "ep": 8
+  },
+  "ops": [
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 9437184,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 96.0,
+    "train_us": 1241.776,
+    "nowait_us": null
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_to_all",
+    "in_nelems": 75497472,
+    "out_nelems": 75497472,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 860.0,
+    "train_us": 1148.5455000000002,
+    "nowait_us": 458.481
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_to_all",
+    "in_nelems": 128,
+    "out_nelems": 128,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 224.0,
+    "train_us": 1055.763,
+    "nowait_us": 6.576499999999999
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 2097152,
+    "out_nelems": 8388608,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 336.0,
+    "train_us": 286.146,
+    "nowait_us": 108.608
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 377489664,
+    "out_nelems": 47186208,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 8.5,
+    "train_us": 49882.52250000001,
+    "nowait_us": 10682.082
+   },
+   {
+    "label": "CP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 1048576,
+    "out_nelems": 262144,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 64.0,
+    "train_us": 1590.8395,
+    "nowait_us": 36.6725
+   },
+   {
+    "label": "CP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 294912,
+    "out_nelems": 73728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 168.0,
+    "train_us": 47.792,
+    "nowait_us": 8.912
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 73728,
+    "out_nelems": 294912,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 168.0,
+    "train_us": 299.3455,
+    "nowait_us": 11.072
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 47186208,
+    "out_nelems": 377489664,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 17.0,
+    "train_us": 6195.0115000000005,
+    "nowait_us": 4439.3235
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_to_all",
+    "in_nelems": 77329152,
+    "out_nelems": 77329152,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 36.0,
+    "train_us": 1002.928,
+    "nowait_us": 436.993
+   },
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 18874368,
+    "out_nelems": 18874368,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 96.0,
+    "train_us": 862.226,
+    "nowait_us": null
+   },
+   {
+    "label": "PP",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 78379.6165,
+    "nowait_us": 6.96
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 786432,
+    "out_nelems": 3145728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 64.0,
+    "train_us": 181.74099999999999,
+    "nowait_us": 42.992000000000004
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 67053856,
+    "out_nelems": 8381732,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 729.989,
+    "nowait_us": 718.547
+   },
+   {
+    "label": "?",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 2698496,
+    "out_nelems": 5396992,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 6024.447,
+    "nowait_us": 39.4065
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 5535592,
+    "out_nelems": 44284736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 697.7139999999999,
+    "nowait_us": 254.832
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 8381732,
+    "out_nelems": 67053856,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 896.3375,
+    "nowait_us": 503.7605
+   },
+   {
+    "label": "?",
+    "collective": "all_reduce",
+    "in_nelems": 2,
+    "out_nelems": 2,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      4
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8,
+      12
+     ],
+     [
+      9,
+      13
+     ],
+     [
+      10,
+      14
+     ],
+     [
+      11,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 1692.1235,
+    "nowait_us": 113.50999999999999
+   },
+   {
+    "label": "CP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 262144,
+    "out_nelems": 1048576,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 64.0,
+    "train_us": 51.616,
+    "nowait_us": 18.304
+   },
+   {
+    "label": "CP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 3145728,
+    "out_nelems": 786432,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 64.0,
+    "train_us": 48.3685,
+    "nowait_us": 46.545
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 44284736,
+    "out_nelems": 5535592,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 949.282,
+    "nowait_us": 691.3454999999999
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 2304,
+    "out_nelems": 288,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 4417.2185,
+    "nowait_us": 37.44
+   },
+   {
+    "label": "CP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11
+     ],
+     [
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 8.0,
+    "train_us": 19.968,
+    "nowait_us": 11.088000000000001
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 2.0,
+    "train_us": 182.433,
+    "nowait_us": 13.584
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 352,
+    "out_nelems": 352,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 647.7284999999999,
+    "nowait_us": 32.672
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Int",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 2855.3145000000004,
+    "nowait_us": 535.422
+   },
+   {
+    "label": "PP",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Int",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 168.7035,
+    "nowait_us": 16.3525
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 28,
+    "out_nelems": 28,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 530.4005,
+    "nowait_us": 30.304
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 1792000,
+    "out_nelems": 1792000,
+    "dtype": "Int",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 739.618,
+    "nowait_us": 86.4315
+   },
+   {
+    "label": "EP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 15420020,
+    "out_nelems": 123360160,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 0.5,
+    "train_us": 1276.0935,
+    "nowait_us": 1237.826
+   }
+  ]
+ },
+ "k3_D_1108_173242": {
+  "world": 16,
+  "degrees": {
+   "pp": 2,
+   "dpr": 1,
+   "dp": 1,
+   "cp": 4,
+   "tp": 2,
+   "ep": 8
+  },
+  "ops": [
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 4718592,
+    "out_nelems": 4718592,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 192.0,
+    "train_us": 922.3205,
+    "nowait_us": null
+   },
+   {
+    "label": "CPxTP/EP",
+    "collective": "all_to_all",
+    "in_nelems": 37748736,
+    "out_nelems": 37748736,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1774.0,
+    "train_us": 621.605,
+    "nowait_us": 201.952
+   },
+   {
+    "label": "TP",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 9437184,
+    "out_nelems": 4718592,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1872.0,
+    "train_us": 61.184,
+    "nowait_us": 58.944
+   },
+   {
+    "label": "CPxTP/EP",
+    "collective": "all_to_all",
+    "in_nelems": 128,
+    "out_nelems": 128,
+    "dtype": "Long",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 448.0,
+    "train_us": 2223.432,
+    "nowait_us": 6.112
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 1048576,
+    "out_nelems": 4194304,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 672.0,
+    "train_us": 615.9535,
+    "nowait_us": 66.912
+   },
+   {
+    "label": "TP",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 4718592,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1872.0,
+    "train_us": 61.6,
+    "nowait_us": 59.616
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 9437184,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 87.697,
+    "nowait_us": 84.1405
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 147456,
+    "out_nelems": 36864,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 336.0,
+    "train_us": 682.689,
+    "nowait_us": 7.712
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 47186496,
+    "out_nelems": 188745984,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 33.0,
+    "train_us": 1242.9705,
+    "nowait_us": 899.8575
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 6458576,
+    "out_nelems": 25834304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 838.4195,
+    "nowait_us": 147.79250000000002
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 36864,
+    "out_nelems": 147456,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 336.0,
+    "train_us": 382.273,
+    "nowait_us": 8.737
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 786432,
+    "out_nelems": 3145728,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 702.5615,
+    "nowait_us": 42.624
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 1048576,
+    "out_nelems": 262144,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 1028.3035,
+    "nowait_us": 36.768
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 1024,
+    "out_nelems": 1024,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 144.0,
+    "train_us": 6.944,
+    "nowait_us": 5.408
+   },
+   {
+    "label": "PP",
+    "collective": "send",
+    "in_nelems": 9437184,
+    "out_nelems": 9437184,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 192.0,
+    "train_us": 400.6555,
+    "nowait_us": null
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 188745984,
+    "out_nelems": 47186496,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.5,
+    "train_us": 5496.04,
+    "nowait_us": 1764.3545
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 512,
+    "out_nelems": 512,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 388.0,
+    "train_us": 11.616,
+    "nowait_us": 6.08
+   },
+   {
+    "label": "CPxTP/EP",
+    "collective": "all_to_all",
+    "in_nelems": 39160512,
+    "out_nelems": 39160512,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 18.0,
+    "train_us": 896.1310000000001,
+    "nowait_us": 203.4405
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 36481296,
+    "out_nelems": 9120324,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 5733.635,
+    "nowait_us": 373.201
+   },
+   {
+    "label": "PP",
+    "collective": "all_reduce",
+    "in_nelems": 1,
+    "out_nelems": 1,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     [
+      2,
+      10
+     ],
+     [
+      3,
+      11
+     ],
+     [
+      4,
+      12
+     ],
+     [
+      5,
+      13
+     ],
+     [
+      6,
+      14
+     ],
+     [
+      7,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 38974.545999999995,
+    "nowait_us": 6.928
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 16.0,
+    "train_us": 1609.9515000000001,
+    "nowait_us": 12.096499999999999
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 25834304,
+    "out_nelems": 6458576,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 4.0,
+    "train_us": 6272.8945,
+    "nowait_us": 272.4165
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 262144,
+    "out_nelems": 1048576,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 202.4355,
+    "nowait_us": 17.951500000000003
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 32.0,
+    "train_us": 8.2405,
+    "nowait_us": 6.5760000000000005
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 2304,
+    "out_nelems": 2304,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 103.0,
+    "train_us": 7.36,
+    "nowait_us": 6.112
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "all_reduce",
+    "in_nelems": 352,
+    "out_nelems": 352,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 6677.875,
+    "nowait_us": 9.712
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 352,
+    "out_nelems": 352,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 1.0,
+    "train_us": 2155.7265,
+    "nowait_us": 5.968
+   },
+   {
+    "label": "TP",
+    "collective": "all_reduce",
+    "in_nelems": 294912,
+    "out_nelems": 294912,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      4,
+      5
+     ],
+     [
+      6,
+      7
+     ],
+     [
+      8,
+      9
+     ],
+     [
+      10,
+      11
+     ],
+     [
+      12,
+      13
+     ],
+     [
+      14,
+      15
+     ]
+    ],
+    "calls_per_rank": 24.5,
+    "train_us": 14.943999999999999,
+    "nowait_us": 13.5045
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "reduceScatterSingleImpl",
+    "in_nelems": 3145728,
+    "out_nelems": 786432,
+    "dtype": "Float",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 128.0,
+    "train_us": 48.7545,
+    "nowait_us": 46.5445
+   },
+   {
+    "label": "CP/FSDP/LOSS",
+    "collective": "allGatherSingleImpl",
+    "in_nelems": 9120324,
+    "out_nelems": 36481296,
+    "dtype": "BFloat16",
+    "instances": [
+     [
+      0,
+      2,
+      4,
+      6
+     ],
+     [
+      1,
+      3,
+      5,
+      7
+     ],
+     [
+      8,
+      10,
+      12,
+      14
+     ],
+     [
+      9,
+      11,
+      13,
+      15
+     ]
+    ],
+    "calls_per_rank": 10.0,
+    "train_us": 933.521,
+    "nowait_us": 260.3695
+   }
+  ]
+ }
+}
