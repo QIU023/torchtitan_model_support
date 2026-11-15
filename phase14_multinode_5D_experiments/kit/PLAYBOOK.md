@@ -221,10 +221,9 @@ K3（`matrix_k3.tsv`）：
 | `k3_B_keep` | 1·2·4·2·8，整步不 reshard | 32K 全部 | FSDP | 和下一行一起，在同一长度、同一 FSDP 模式下比 EP 放置 | 同上 |
 | `k3_B_ep16_keep` | 1·2·4·2·16，整步不 reshard | 32K 全部 | EP | 同上 | 同上 |
 
-另有三行：
+另有两行：
 - `k3_A_rep`：`k3_A` 紧接着再跑一次，两次的差就是噪声底线；
-- `k3_A_compile`：`k3_A` 开 compile，量编译时间和编译后的 MFU，编译 cache 留在共享卷上；
-- `k3_A_ckpt`：可靠性演练，标了 `+optional`，默认不跑（第 8.2 节）。
+- `k3_A_compile`：`k3_A` 开 compile，量编译时间和编译后的 MFU，编译 cache 留在共享卷上。
 
 要成对比较的行写在 `pairs_k3.tsv`（32、64 卡是 `pairs_k3_n4.tsv`、`pairs_k3_n8.tsv`），流水线收尾时由 `compare_pairs.py` 出表。
 
@@ -294,7 +293,6 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_FLAVOR=k3_<卡数>x{mem}[_e<专家数>]`：这一行换一个 flavor，`{mem}` 按卡型换成 `80g` 或 `141g`；
 - `MN_SEQ=<n>`：固定这一行的长度，`MN_SEQ_FORCE` 不覆盖它（长上下文的行用）；
 - `MN_COMPILE=1`：这一行开 compile（清单默认 0）；
-- `MN_CKPT_STEP=<n>`：第 n 步存一次完整 checkpoint，存到运行目录外的 `runs/<hw>/ckpt/<行名>/`，重跑时从它接着跑；`MN_CKPT_ASYNC=async` 换成异步存盘；
 - `MN_PROFILE_SHAPES=1`：trace 里记算子的输入形状（默认不记，录 trace 那一步拖慢得少一些）；
 - `+<标签>`：给这一行打标签，`MN_ROWS=+<标签>` 选出所有带它的行；`+optional` 的行只有被点名（行名或标签）时才跑；
 - `h200:VAR=值`：只在这种卡上生效；
@@ -495,23 +493,6 @@ Together 的集群不能暂停，停止计费只能删集群。共享卷默认�
 - **卷没有快照和备份：** 删卷数据就没了；没有集群用它的时候也照样按月计费。重要结果定期 `collect` 回本机。
 - **换了卡型：** 在 H100 和 H200 之间换，清单里的 `HW` 要跟着改，结果会写在另一个 `runs/<hw>/` 下。
 - **驱动变旧：** 新集群驱动的 CUDA 版本比原来低时，删掉卷上的 `SETUP_OK`，bootstrap 会按新驱动重装 torch。
-
-### 8.2 可靠性短演练（可选，16 卡，约 15 分钟）
-
-练三件事：存一次完整 checkpoint 要停多久、读回来要多久、训练进程或 pod 被杀以后能不能从 checkpoint 接着跑。
-
-```sh
-bash $K8S scope MN_ROWS=+drill        # 只跑 k3_A_ckpt：第 3 步存一次完整 checkpoint（参数、优化器状态、数据进度）
-bash $K8S retask
-# 训练日志出现 "Finished saving the checkpoint" 之后、第 5 步之前，二选一：
-bash $K8S kill                        # 杀掉所有节点上的训练进程，pod 不动；之后 bash $K8S start
-kubectl delete pod <p14-1-...>        # 或者删掉一个 pod，Job 会补一个新的，新 pod 自己接着跑
-```
-
-- 被打断的那次不算失败，流水线重跑这一行。titan 在 `runs/<hw>/ckpt/k3_A_ckpt/` 里找到第 3 步的 checkpoint，从第 4 步接着跑，日志里有 `Finished loading the checkpoint in ... seconds`。
-- `summary.tsv` 的 `ckpt_save_s`、`ckpt_load_s` 是存盘、读盘最慢的那个 rank 的秒数。
-- 数据量：`k3_16x80g` 的 fp32 参数加 AdamW 状态约 14.5B × 12 字节 ≈ 174 GB（梯度不存），最后一步还会再存一份只有模型的 fp32（约 58 GB）。共享卷要留出约 250 GB，演练完删掉 `runs/<hw>/ckpt/`。
-- 想看异步存盘：`bash $K8S cell measure k3_A_ckpt MN_CKPT_ASYNC=async`，和同步那次的 `ckpt_save_s` 比。
 
 ## 9. 出问题时
 
