@@ -73,6 +73,27 @@
   3. #4751：跨步 `_grouped_mm` 第一次实跑；
   4. 其余。
 
+## 上游已合入或 open 的改动，哪些让我们的 PR 过期（11-14 查）
+
+方法：
+
+- 在 main 的 `d6810e4d6..631d544b1` 里按关键词 grep 提交；
+- GitHub search 查 open PR，关键词 minimax、lora、video、vision encoder、ViT、offload、attention residual、expert load balancing、dist_moe、frozen、kimi_k3；
+- 重叠的那些，读 body 和改动的文件。
+
+| 我们的 PR | 上游 | 状态 | 结论 |
+| --- | --- | --- | --- |
+| #4765 PP offload | #6020 anijain2305 "Activation offloading on torch_remat saved-tensor hooks"（+1671，ready）；#6022 同一作者 "Schedule-driven activation offload for pipeline stages"（draft） | open | **基本被取代。** 两者都按 block 装 `torch_remat.saved_tensors_hooks`，remat 开关都能用，D2H 走 side stream；#6022 让 PP 调度决定何时 offload 和 reload。通用、不限模型，#4765 只是 K3 stage 范围的同一件事。main 的 #5090 早就有按 block 的 saved-tensor hook 接口 |
+| #4764 PP balance | 同上 | open | **底层被取代。** 剩下独有的只有：按 profile 规划 offload，以及经 Mooncake 停到较轻的 PP rank 上。Mooncake 不是 PyTorch 库，违反上游 `.claude/CLAUDE.md` 原则 3（核心训练基础设施不依赖非 PyTorch 库），原样很难进 |
+| #4576 LoRA | 已合入：#5884（适配器放置）、#6057（有冻结参数时 HF 导出直接 raise，带 PEFT 导出的 TODO）、#5844（RL 只同步 adapter，私有方法）、#6003、#5893。open：#6058 fegin "Leave frozen parameters out of training checkpoints"（draft）、#5738 HJSang shared-outer 的 expert adapter 布局 | 部分合入 | **5 个提交里 1 个被取代**；"main 上建不出 K3" 这个前提大概率不成立了。导出这块：维护者选了先 raise、以后做 PEFT 格式导出，#6058 让 checkpoint 只存可训练的部分；PR 的 merged 导出要和 fegin 的方向对齐。#5738 合入后 merge 要支持 shared-outer 布局。**冻结 PP rank 照样 step 的那部分，没有人做，是最站得住的** |
+| #4751 MoonEP | open：shuhuayu 的 Dist-MoE 跑 K3 系列（#5684 SiTU-GLU、#6049 PP stage、#6050 planner overflow，都是 draft）；#5517 felipemello1 推理时 shared experts 走 side stream（draft） | open | **功能上没被取代**（Dist-MoE 的 README 写明 "does not truncate or rebalance routing"），**方向上被挤**：维护者正把 Dist-MoE 做成 K3 的后端，而它和 `TokenDispatcherTransform` 互斥。`shared_experts_stream` 一项和 #5517 部分重叠，而且在 K3 上本来就不起作用 |
+| #4963 | #6049（shuhuayu draft）给 K3 的 PP stage 加静态 metadata，按 `(hidden, delta_TND [T, n_i, D])` 的载体写 | open | 没被取代，**直接冲突**：#4963 把载体改成每个 block 一个张量。#6049 大概率先合，之后 #4963 的静态 metadata 要改成按 block 列 |
+| #4381 DEP | #6049 改同一个 pipeline builder 和 stage | open | 没被取代。DEP 多出来的 `vision_embeds` 输入要进 #6049 的静态 metadata |
+| #4656 | 已合入：#5033（编译区）、#5939（mul+sum）。open：#5187 elfiegg 降低反向显存（draft）、#5156 和 #5913 felipemello1（draft） | 有合入，有 open | 没被取代（main 仍然每打开一个 block 就 cat 一次 stack），但这个区域维护者正在持续优化，冲突多，收益要对 mul+sum 版的 main 重测 |
+| #4380 dynamic CP | 已合入 #5266（vision encoder 在 CP 上不切，只在 dp_shard 上切）；open #5993、#5992 pianpwk（按 `vision_encoder_cost` 把重的 micro-batch 排在前面，跨 DP 平衡，draft） | 有合入，有 open | 没被取代。#5266 是维护者选的另一条路（不切），#5992 和 #5993 是在 DP 层面做平衡，和切图是两件事 |
+| #5469 视频 | #5873 只提供接口 | 已合入 | 没被取代，也没有别的 K3 视频 PR |
+| #5635、#5619 M3 | 没有 | — | 没被取代。search "minimax" 只搜到这两个 |
+
 ## 推送（没推成，命令留给用户）
 
 - 11-14 读过远端，7 个 review 分支和 11 个 PR 分支的 tip 都和上面的源相同。
