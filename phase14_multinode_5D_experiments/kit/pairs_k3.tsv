@@ -8,3 +8,4 @@ k3_B	k3_B_keep	FSDP 每个 micro-batch 重新 gather、归约梯度，对整步�
 k3_B	k3_B_ep16	EP 8 在节点内，对 EP 16 跨两个节点
 k3_B_keep	k3_B_ep16_keep	整步不 reshard 时：EP 8 对 EP 16
 k3_D	k3_D_ulysses	CP 的 all-gather 对 Ulysses
+k3_B_ep16	k3_B_ep16_hybridep	EP 16 跨两个节点：NCCL 的 all-to-all 对 HybridEP

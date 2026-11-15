@@ -26,8 +26,16 @@ if [ "${MN_NCCL_INFO:-1}" = 1 ]; then
   mkdir -p $D/nccl
   NCCL_LOG=(NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET NCCL_DEBUG_FILE=$D/nccl/%h.%p.log)
 fi
+# MN_NCCL_LIB preloads a replacement NCCL (ext_build.sh nccl) ahead of the one torch bundles; summary.tsv's nccl
+# column shows the version that ran. HybridEP and DeepEP get the CUDA toolkit ext_build.sh kept on the volume.
+EXTRA=()
+[ -z "${MN_NCCL_LIB:-}" ] || EXTRA+=(LD_PRELOAD=$MN_NCCL_LIB)
+if [ "${MN_EP_BACKEND:-standard}" != standard ]; then
+  CUDA_DIR=$(ls -d $B/cuda-* 2>/dev/null | tail -n 1)
+  [ -z "$CUDA_DIR" ] || EXTRA+=(CUDA_HOME=$CUDA_DIR PATH=$CUDA_DIR/bin:$PATH)
+fi
 # Every rank logs its step line, so the memory of each pipeline stage is visible; lines carry the global rank.
-env "${NCCL_LOG[@]}" LOG_RANK=$(seq -s, 0 $((NNODES * NPROC - 1))) PYTHONPATH=$T \
+env "${NCCL_LOG[@]}" "${EXTRA[@]}" LOG_RANK=$(seq -s, 0 $((NNODES * NPROC - 1))) PYTHONPATH=$T \
 TORCHINDUCTOR_CACHE_DIR=$CACHE/ic TRITON_CACHE_DIR=$CACHE/tc \
 PYTORCH_ALLOC_CONF=${PYTORCH_ALLOC_CONF:-expandable_segments:True} PYTHONUNBUFFERED=1 \
 timeout ${MN_TIMEOUT:-5400} torchrun --nnodes=$NNODES --nproc_per_node=$NPROC --node_rank=$NODE_RANK \

@@ -80,10 +80,19 @@ def network(cell: Path) -> str:
     return "Socket" if "NET/Socket : Using" in text else "?"
 
 
+def nccl_version(cell: Path) -> str:
+    """The NCCL version the run's NCCL INFO files report (a replacement library shows its own), or -."""
+    for p in cell.glob("nccl/*.log"):
+        m = re.search(r"NCCL version (\S+)", p.read_text(errors="replace"))
+        if m:
+            return m.group(1)
+    return "-"
+
+
 def parse_cell(cell: Path, nproc: int, skip: int) -> dict:
     rows, oom = cell_rows(cell)
     rcs = ",".join(p.read_text().strip() for p in sorted(cell.glob("rc_node*"))) or "-"
-    out = dict(cell=cell.name, rc=rcs, oom="OOM" if oom else "", steps=0, net=network(cell))
+    out = dict(cell=cell.name, rc=rcs, oom="OOM" if oom else "", steps=0, net=network(cell), nccl=nccl_version(cell))
     if not rows:
         return out
     steps = sorted({r["step"] for r in rows})
@@ -127,7 +136,7 @@ def main() -> None:
     columns = [
         "cell", "rc", "oom", "steps", "loss_first", "loss_last",
         "peak_mem_gib", "peak_mem_pct", "peak_rank", "tps", "tflops", "mfu", "step_s", "first_step_s",
-        "step_s_clean", "mfu_clean", "net",
+        "step_s_clean", "mfu_clean", "net", "nccl",
     ]
     print("\t".join(columns))
     for cell in sorted(p for p in args.stage_dir.iterdir() if p.is_dir()):

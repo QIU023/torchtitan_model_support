@@ -15,8 +15,8 @@ at the end node 0 writes the stage summaries, the monitor summary, the NCCL vari
 report and the paired comparison of pairs_<model>[_n<NNODES>].tsv (compare_pairs.py).
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
-MN_ROWS (only these matrix rows; +<tag> selects the rows a matrix tags so; empty runs every row but the
-+optional ones), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
+MN_ROWS (only these matrix rows; +<tag> selects the rows a matrix tags so, +all every row but the +optional ones,
+which is also what empty means), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MIN_SEQ (4096), MEAS_STEPS,
 PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops every node once the current attempt is over.
 """
 
@@ -176,6 +176,8 @@ def build_tasks() -> list[dict]:
     def selected(r: dict) -> bool:
         if not only:
             return "optional" not in r["tags"]
+        if "+all" in only and "optional" not in r["tags"]:
+            return True
         return r["name"] in only or any("+" + tag in only for tag in r["tags"])
 
     tasks = [dict(id="preflight", kind="preflight")] if ENV.get("MN_PREFLIGHT", "1") != "0" else []

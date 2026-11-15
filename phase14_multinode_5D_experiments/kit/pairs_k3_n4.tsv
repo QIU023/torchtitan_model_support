@@ -5,3 +5,4 @@ k3_A4	k3_A4_v4	61 层、PP 4：VPP 2 对 VPP 4
 k3_A4	k3_A4_compile	eager 对 compile
 k3_A4	k3_5d4	TP 4 对 CP 2 × TP 2（61 层）
 k3_E4_ep8	k3_E4_ep16	256 个专家：EP 8 在节点内，对 EP 16 跨两个节点
+k3_E4_ep16	k3_E4_ep16_hybridep	EP 16 跨两个节点：NCCL 的 all-to-all 对 HybridEP

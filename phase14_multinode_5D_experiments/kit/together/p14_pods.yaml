@@ -107,6 +107,10 @@ spec:
           value: "5"
         - name: MN_ORDER
           value: row
+        # Communication libraries to build after setup (ext_build.sh), e.g. "hybridep" for the +ep_backend rows;
+        # node 0 builds each once onto the shared volume.
+        - name: MN_EP_LIBS
+          value: ""
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: compute,utility
         - name: HF_TOKEN

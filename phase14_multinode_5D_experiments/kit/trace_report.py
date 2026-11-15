@@ -11,7 +11,12 @@ InfiniBand rates, and the straggler gap: the most compute time any rank spent, l
 and rank), trace_report_groups.tsv (each process group's hashed name, as Perfetto shows it on an NCCL kernel, with
 its label and member ranks), trace_report_kernels.tsv (per cell and rank: kernel time by family, the compute stream's
 kernel count and sizes, and the GPU time of the pipeline schedule's forward and backward actions) and
-trace_report_topk.tsv (per cell, the kernels that take the most time) into the stage directory, and prints the first.
+trace_report_topk.tsv (per cell, the kernels that take the most time), trace_report_comm.tsv (per cell and collective:
+the in-training time, the time without waiting -- the shortest any member rank took for the same call, matched by the
+group's sequence number, since the last rank to arrive does not wait -- the start skew between the members, and the
+bandwidth both imply) and trace_report_replay.json (the same collectives with their member ranks and message sizes,
+the plan comm_replay.py runs in isolation on the cluster) into the stage directory, and prints the first.
+Start skews of groups that span nodes include the nodes' clock offset (a few milliseconds on 11-08).
 A kernel's family comes from its name, except that kernels inside a kda/ GPU annotation count as KDA.
 """
 
@@ -19,6 +24,7 @@ import argparse
 import bisect
 import gzip
 import json
+import math
 import os
 import re
 import statistics
@@ -63,6 +69,11 @@ KERNEL_COLUMNS = (
     + ["stream_kernels", "small_pct", "median_us", "pp_f_ms", "pp_b_ms", "pp_actions"]
 )
 TOPK_COLUMNS = ["cell", "family", "kernel", "per_rank", "ms_per_rank", "mean_us"]
+COMM_COLUMNS = [
+    "cell", "label", "collective", "msg_mb", "dtype", "calls_per_rank", "train_ms_per_rank", "train_us", "nowait_us",
+    "wait_pct", "skew_us", "train_busbw", "nowait_busbw",
+]
+REPLAY_TOP = 30
 PP_ACTION = re.compile(r"PP:\d+([FB])\d+$")
 SMALL_US = 10.0
 
@@ -193,6 +204,7 @@ def analyze_rank(path_str: str) -> dict:
     families: dict[str, list] = defaultdict(lambda: [0, 0.0])
     names: dict[str, list] = {}
     stream_durs: dict = defaultdict(list)
+    calls = []  # (group name, seq, collective, in nelems, out nelems, dtype, start, duration)
     intervals = []  # (start, end, kind 0 compute / 1 comm / 2 copy, group key)
     groups: dict[tuple, list] = defaultdict(lambda: [0, 0.0, 0])  # key -> [kernels, kernel_us, bytes]
     unattributed = 0.0
@@ -221,6 +233,14 @@ def analyze_rank(path_str: str) -> dict:
                 except (TypeError, ValueError):
                     n = 0
                 nbytes = message_bytes(args)
+                try:
+                    calls.append((
+                        str(args.get("Process Group Name") or ""), args.get("Seq"), collective,
+                        int(args.get("In msg nelems") or 0), int(args.get("Out msg nelems") or 0),
+                        str(args.get("dtype", "")).split("::")[-1], ts, dur,
+                    ))
+                except (TypeError, ValueError):
+                    pass
             else:
                 desc, collective, n, nbytes = "?", kernel_collective(name), 0, 0
                 unattributed += dur
@@ -286,6 +306,7 @@ def analyze_rank(path_str: str) -> dict:
             main_sorted[len(main_sorted) // 2] if main_sorted else None,
         ),
         pp=(pp_us["F"], pp_us["B"], pp_actions),
+        calls=calls,
     )
 
 
@@ -453,7 +474,87 @@ def cell_rows(cell: Path, ranks: list[dict], nproc: int, extra: dict):
              mean_us=us / count if count else None)
         for short, (family, count, us) in sorted(merged_names.items(), key=lambda kv: -kv[1][2])[:20]
     ]
-    return row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows
+    comm_rows, plan = comm_report(cell, ranks, deg, pg_label)
+    return row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows, comm_rows, plan
+
+
+def size_bucket(nelems: int) -> int:
+    return round(math.log(nelems, 1.25)) if nelems > 0 else -1
+
+
+def comm_report(cell: Path, ranks: list[dict], deg: dict[str, int], pg_label: dict[str, str]):
+    """Per collective and message size: in-training time, time without waiting, start skew; and the replay plan.
+
+    The members of one call are matched by group and sequence number. A call's size is the median over its members
+    (all-to-all sends different amounts per rank), and calls are pooled by size in steps of 25%.
+    """
+    n_ranks = len(ranks)
+    members: dict[str, set] = defaultdict(set)
+    by_call: dict[tuple, list] = defaultdict(list)
+    p2p: dict[tuple, list] = defaultdict(list)
+    for r in ranks:
+        for name, seq, collective, n_in, n_out, dtype, ts, dur in r.get("calls", []):
+            members[name].add(r["rank"])
+            if collective in ("send", "recv"):
+                n = max(n_in, n_out)
+                p2p[("PP" if deg["pp"] > 1 else pg_label.get(name, "?"), "send", size_bucket(n), dtype)].append((n, n, dur))
+            elif seq is not None:
+                by_call[(name, seq)].append((r["rank"], ts, dur, n_in, n_out, collective, dtype))
+    ops_calls: dict[tuple, list] = defaultdict(list)  # op -> [(n_in, n_out, durations, nowait, skew)]
+    for (name, _), hits in by_call.items():
+        n_in = int(statistics.median(h[3] for h in hits))
+        n_out = int(statistics.median(h[4] for h in hits))
+        op = (pg_label.get(name, "?"), hits[0][5], size_bucket(max(n_in, n_out)), hits[0][6])
+        durs = [h[2] for h in hits]
+        ops_calls[op].append((n_in, n_out, durs, min(durs) if len(hits) > 1 else None,
+                              max(h[1] for h in hits) - min(h[1] for h in hits) if len(hits) > 1 else None))
+    for op, entries in p2p.items():
+        ops_calls[op] = [(n, n, [d], None, None) for n, _, d in entries]
+    group_sizes: dict[str, int] = {}
+    for name, ms in members.items():
+        group_sizes.setdefault(pg_label.get(name, "?"), len(ms))
+    pp_pairs = sorted(
+        [a, b] for ms, labels in mesh_groups(deg).items() if "PP" in labels
+        for a, b in zip(sorted(ms), sorted(ms)[1:])
+    )
+    rows, ops = [], []
+
+    def total(entries):
+        return sum(sum(e[2]) for e in entries)
+
+    for op, entries in sorted(ops_calls.items(), key=lambda kv: -total(kv[1])):
+        label, collective, _, dtype = op
+        n_in = int(statistics.median(e[0] for e in entries))
+        n_out = int(statistics.median(e[1] for e in entries))
+        elem = DTYPE_BYTES.get(dtype, 0)
+        size = max(n_in, n_out) * elem
+        factor = bus_factor(collective, group_sizes.get(label, 2))
+        durs = [d for e in entries for d in e[2]]
+        nowait = [e[3] for e in entries if e[3] is not None]
+        skews = [e[4] for e in entries if e[4] is not None]
+        train = statistics.median(durs)
+        free = statistics.median(nowait) if nowait else None
+        rows.append(dict(
+            cell=cell.name, label=label, collective=collective, msg_mb=size / 1e6, dtype=dtype,
+            calls_per_rank=round(len(durs) / n_ranks, 1), train_ms_per_rank=sum(durs) / n_ranks / 1e3,
+            train_us=train, nowait_us=free,
+            wait_pct=100 * (1 - free / train) if free and train else None,
+            skew_us=statistics.median(skews) if skews else None,
+            train_busbw=size / (train * 1e-6) * factor / 1e9 if train else None,
+            nowait_busbw=size / (free * 1e-6) * factor / 1e9 if free else None,
+        ))
+        if len(ops) < REPLAY_TOP and size:
+            instances = pp_pairs if collective == "send" else sorted(
+                sorted(m) for k, m in members.items() if pg_label.get(k) == label and len(m) > 1
+            )
+            instances = [list(x) for x in dict.fromkeys(tuple(i) for i in instances)]
+            if instances:
+                ops.append(dict(
+                    label=label, collective=collective, in_nelems=n_in, out_nelems=n_out, dtype=dtype,
+                    instances=instances, calls_per_rank=round(len(durs) / n_ranks, 1),
+                    train_us=train, nowait_us=free,
+                ))
+    return rows, dict(world=n_ranks, degrees=deg, ops=ops)
 
 
 def monitor_stats(stage_dir: Path) -> dict:
@@ -504,7 +605,8 @@ def main() -> int:
         print(f"no traces under {args.stage_dir}/*/tt/profiling/traces")
         return 1
     stats = monitor_stats(args.stage_dir)
-    cell_out, pg_out, rank_out, group_out, kernel_out, topk_out = [], [], [], [], [], []
+    cell_out, pg_out, rank_out, group_out, kernel_out, topk_out, comm_out = [], [], [], [], [], [], []
+    plans = {}
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         for cell in cells:
             files = trace_files(cell)
@@ -515,7 +617,7 @@ def main() -> int:
                 print(f"{cell.name}: unreadable (truncated?) traces of ranks {bad}", file=sys.stderr)
             if not ranks:
                 continue
-            row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows = cell_rows(
+            row, pg_rows, rank_rows, group_rows, kernel_rows, topk_rows, comm_rows, plan = cell_rows(
                 cell, ranks, args.nproc, extras(args.stage_dir, cell, args.nproc, stats)
             )
             cell_out.append(row)
@@ -524,6 +626,8 @@ def main() -> int:
             group_out += group_rows
             kernel_out += kernel_rows
             topk_out += topk_rows
+            comm_out += comm_rows
+            plans[cell.name] = plan
             print(f"{cell.name}: {len(files)} ranks", file=sys.stderr)
     write_tsv(args.stage_dir / "trace_report.tsv", CELL_COLUMNS, cell_out)
     write_tsv(args.stage_dir / "trace_report_pg.tsv", PG_COLUMNS, pg_out)
@@ -531,6 +635,8 @@ def main() -> int:
     write_tsv(args.stage_dir / "trace_report_groups.tsv", GROUP_COLUMNS, group_out)
     write_tsv(args.stage_dir / "trace_report_kernels.tsv", KERNEL_COLUMNS, kernel_out)
     write_tsv(args.stage_dir / "trace_report_topk.tsv", TOPK_COLUMNS, topk_out)
+    write_tsv(args.stage_dir / "trace_report_comm.tsv", COMM_COLUMNS, comm_out)
+    (args.stage_dir / "trace_report_replay.json").write_text(json.dumps(plans, indent=1))
     print((args.stage_dir / "trace_report.tsv").read_text(), end="")
     return 0
 

@@ -17,7 +17,7 @@ ulimit -l unlimited 2>/dev/null || true
 if [ -z "${MN_COMM_TAG:-}" ] || [ "${MN_COMM_RDMA:-0}" = 1 ]; then
   MN_COMM_DIR=$R bash $K/rdma_bw.sh > $R/rdma_run_node$NODE_RANK.log 2>&1
 fi
-NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,ENV,TUNING timeout ${MN_TIMEOUT:-1800} \
+env ${MN_NCCL_LIB:+LD_PRELOAD=$MN_NCCL_LIB} NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,ENV,TUNING timeout ${MN_TIMEOUT:-1800} \
   torchrun --nnodes=$NNODES --nproc_per_node=$NPROC --node_rank=$NODE_RANK \
   --master_addr=$MASTER_ADDR --master_port=${MN_PORT:-$((MASTER_PORT + 900))} \
   $K/comm_bench.py --min-bytes ${MN_COMM_MIN_BYTES:-256} --out $R/comm_bench.json > $L 2>&1 < /dev/null

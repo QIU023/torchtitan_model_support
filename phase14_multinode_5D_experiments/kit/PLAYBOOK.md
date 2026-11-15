@@ -463,6 +463,39 @@ bash $K8S comm          # 新的 comm_qps8 会出现在对比表里
 bash $K8S start
 ```
 
+### 7.6 通信层：从找瓶颈到改 NCCL
+
+按顺序做，每一步都要先证明上一步不够：
+
+1. **分清是网络慢还是在等**（本机就能做，不花钱）。看 `trace_report_comm.tsv`，每格、每种 collective、每档消息大小一行：
+   - `train_us`：训练里 kernel 时长的中位数；
+   - `nowait_us`：同一次调用里最快那个 rank 的时长。最后到的 rank 不用等，所以它约等于纯传输时间；
+   - `wait_pct`：训练时长里有多少是在等；`skew_us`：同一次调用各 rank 开始时间的差。跨节点的组含两个节点的时钟差，11-08 是几毫秒；
+   - `nowait_busbw`：不算等待时的带宽。拿它和硬件上限比：节点内是 NVLink，跨节点是每张卡一张 400G 网卡（50 GB/s）；
+   - 怎么读：
+     - `wait_pct` 高：在等，回去查 workload（慢卡、气泡、路由不均）；
+     - `nowait_busbw` 接近上限：网络已经饱和，要减少流量（第 5 步）；
+     - 两者都不是：做第 2 步。
+2. **单独回放**（要集群，几分钟）：`bash $K8S replay measure <行>`。用训练里同样的 rank 组合、同样的消息大小，把这一格最耗时的 30 种 collective 单独各跑 20 次，结果在 `<格>/replay/replay.tsv`：
+   - 单独跑的时间约等于 `nowait_us`：训练里的传输就是网络能给的速度；
+   - `nowait_us` 明显更长：训练时有干扰，比如别的流量，或者和计算抢 SM。
+3. **只改配置**：`comm_sweep.tsv` 里的 NCCL 环境变量（第 7.3、7.4 节）。
+4. **NCCL 插件**：
+   - `bash $K8S build nccl` 编出和 torch 同版本的 NCCL，以及 NCCL 自带的 tuner、profiler 示例插件，放在共享卷的 `nccl/<版本>/`；
+   - 在矩阵行里加 `NCCL_TUNER_PLUGIN=<路径>`（按 collective 和消息大小指定算法、协议、通道数）或 `NCCL_PROFILER_PLUGIN=<路径>`。
+5. **换 EP 后端**（减少跨节点流量）：`k3_B_ep16_hybridep` 用 HybridEP，和用 NCCL all-to-all 的 `k3_B_ep16` 成对比较（32、64 卡对应 `k3_E4_ep16_hybridep`、`k3_E8_ep16_hybridep`）。
+   - HybridEP 节点内走 NVLink、节点间走 RDMA，同一个 token 发往同一个节点只发一次；
+   - 清单里设 `MN_EP_LIBS=hybridep`：setup 之后 node 0 编一次 DeepEP 的 hybrid-ep 分支，纸面估计 15 到 30 分钟；
+   - 用 `bash $K8S apply 2 "+all +ep_backend"` 拉起：整个矩阵加上这几行；
+   - 也可以 `MN_EP_BACKEND=deepep` 配 `MN_EP_LIBS=deepep`。
+6. **改 NCCL 源码**：`bash $K8S build nccl <ref> <patch>`，然后在矩阵行里加 `MN_NCCL_LIB=<目录>/lib/libnccl.so.2`。
+   - 先换一次不打补丁、和 torch 同版本的 NCCL（`bash $K8S build nccl`），确认 `summary.tsv` 的 `nccl` 列变成了新库、步时间没变，再换打了补丁的。
+
+另外三点：
+- **RDMA 层：** pod 里只能动 NCCL 的 IB 变量，比如 service level、自适应路由、每个连接的 QP 数。fabric 本身在 Together 那边。
+- **编译用的 CUDA：** torch 是 CUDA 13.0，容器里是 12.8。`ext_build.sh` 第一次会从 NVIDIA 的 apt 源装一套一致的 toolkit，放在共享卷的 `cuda-<版本>/` 里，几 GB。
+- **这些构建都还没在集群上跑过：** 失败原因在 `$BASE/ext_build*.log` 里。用到这个后端的行会失败、被放弃，不影响其他行。
+
 ## 8. 收尾
 
 1. `bash $K8S status` 显示 `ALL_DONE`（或者你决定停在这里），然后 `bash $K8S fetch h100 $R/raw`，把整份运行文件拉回本机（`raw/` 被 `results/.gitignore` 排除，不进 git）。只要结果、不要 trace 时用 `bash $K8S collect $R`。

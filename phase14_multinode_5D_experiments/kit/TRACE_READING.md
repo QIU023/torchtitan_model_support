@@ -147,6 +147,8 @@ PyTorch profiler（Kineto）的 trace 到 kernel 级别，但看不到 kernel �
    再解释训练里为什么还是选了 RING。
 4. **被盖住的比例：** 一个 collective 跑的时候，`stream 7` 上有没有计算 kernel 同时在跑？对照 `measure_trace_report.tsv` 的 `overlap_pct`。
 
+5. **不用逐个点：** `measure_trace_report_comm.tsv` 已经把每种 collective、每档消息大小的这些量算好了。`nowait_us` 是同一次调用里最快那个 rank 的时长，约等于纯传输时间；`wait_pct` 是训练时长里等待的比例；`skew_us` 是各 rank 开始时间的差。要在集群上单独回放核对，用 `bash $K8S replay measure <行>`（`PLAYBOOK.md` 第 7.6 节）。
+
 能回答就算过：k3_A 的 PP 暴露 25% 里，传输占多少、等待占多少；EP 的 all-to-all 为什么只有 48 GB/s。
 
 ## 3. 第三层：计算 kernel

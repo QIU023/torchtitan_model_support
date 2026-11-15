@@ -36,6 +36,10 @@
 #   k8s.sh cell <stage> <row> [VAR=value ...]   one cell by hand on both pods, with the pipeline's settings for that
 #                              stage and row (plus overrides such as MN_SEQ=16384), into runs/<hw>/manual/<stage>/;
 #                              waits for it, printing the newest step, then prints its summary (stop the pipeline first)
+#   k8s.sh replay <stage> <row>   one measured cell's collectives replayed in isolation on every pod (comm_replay.py):
+#                              in-training time, time without waiting, isolated time (stop the pipeline first)
+#   k8s.sh build nccl [ref] [patch] | hybridep | deepep   build a communication library on pod 0 (ext_build.sh),
+#                              detached; the log is $BASE/ext_build.log
 #   k8s.sh both '<command>'    one command in every pod at once, detached (manual work; stop the pipeline first)
 # Environment: NS (default), JOB (p14), BASE (/mnt/shared/p14, MN_BASE in the manifest), PYTHON (python3).
 set -euo pipefail
@@ -285,6 +289,27 @@ case "${1:-status}" in
     done
     on "$(any)" "echo \"rc: \$(cat $d/rc_node* | tr '\\n' ' ')\"; grep -h 'multinode_5d\]' $d/node0.log | head -n 1
       $PY $KIT/summarize.py \$(dirname $d) | grep -E '^cell|^$name'; true" ;;
+  replay)
+    stage=${2:?stage, e.g. measure} row=${3:?row}
+    for p in $(pods); do
+      if [ "$(on "$p" "pgrep -f 'pipelin[e].py|torchtita[n].train' > /dev/null && echo busy; true")" = busy ]; then
+        echo "$p: a pipeline or a training run is active; k8s.sh stop (or kill) first" >&2
+        exit 1
+      fi
+    done
+    cell=$(on "$(any)" "for c in $RUNS/*/$stage/$row $RUNS/*/$stage/${row}_[0-9][0-9][0-9][0-9]_[0-9]*; do [ -d \$c ] && echo \$c; done | tail -n 1")
+    [ -n "$cell" ] || { echo "no $stage/$row under $RUNS" >&2; exit 1; }
+    on "$(any)" "grep -q '\"$(basename "$cell")\"' $(dirname "$cell")/trace_report_replay.json 2>/dev/null || $PY $KIT/trace_report.py $(dirname "$cell") > /dev/null; rm -rf $cell/replay"
+    detached "replay_$row" "MN_PORT=$((29900 + RANDOM % 50)) bash $KIT/replay.sh $cell"
+    until [ "$(on "$(any)" "for k in \$(seq 0 $((NN - 1))); do [ -f $cell/replay/rc_node\$k ] || exit 0; done; echo done")" = done ]; do
+      sleep 15
+    done
+    on "$(any)" "echo rc: \$(cat $cell/replay/rc_node* | tr '\\n' ' '); cat $cell/replay/replay.tsv 2>/dev/null || tail -n 20 $cell/replay/replay_node0.log" ;;
+  build)
+    shift
+    p=$(pod 0)
+    on "$p" "setsid nohup bash $KIT/ext_build.sh $* > $BASE/ext_build.log 2>&1 < /dev/null & true"
+    echo "building ($*) on $p; follow: kubectl exec $p -- tail -f $BASE/ext_build.log" ;;
   both)
     detached "both_$(date +%H%M%S)" "${2:?command}" ;;
   *)
