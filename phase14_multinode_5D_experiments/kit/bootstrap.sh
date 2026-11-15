@@ -32,7 +32,13 @@ done
 echo "$(date +%T) $(hostname): shared setup ready"
 # Communication libraries the manifest asks for (MN_EP_LIBS, e.g. hybridep): node 0 builds each once (ext_build.sh);
 # a failed build only makes the rows that use it fail.
+# HybridEP and DeepEP v2 are branches of one package (deep_ep), so only the first of them listed is built.
+EP_LIBS="" EP_ONE=""
 for lib in ${MN_EP_LIBS:-}; do
+  case $lib in hybridep|deepep) [ -n "$EP_ONE" ] && { echo "MN_EP_LIBS: $lib skipped, $EP_ONE already chosen"; continue; }; EP_ONE=$lib ;; esac
+  EP_LIBS="$EP_LIBS $lib"
+done
+for lib in $EP_LIBS; do
   if [ "$NODE_RANK" = 0 ] && [ ! -f $B/EXT_OK_$lib ] && [ ! -f $B/EXT_FAIL_$lib ]; then
     bash $KIT/ext_build.sh $lib > $B/ext_build_$lib.log 2>&1 || touch $B/EXT_FAIL_$lib
   fi

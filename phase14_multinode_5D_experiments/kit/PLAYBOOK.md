@@ -487,7 +487,7 @@ bash $K8S start
    - HybridEP 节点内走 NVLink、节点间走 RDMA，同一个 token 发往同一个节点只发一次；
    - 清单里设 `MN_EP_LIBS=hybridep`：setup 之后 node 0 编一次 DeepEP 的 hybrid-ep 分支，纸面估计 15 到 30 分钟；
    - 用 `bash $K8S apply 2 "+all +ep_backend"` 拉起：整个矩阵加上这几行；
-   - 也可以 `MN_EP_BACKEND=deepep` 配 `MN_EP_LIBS=deepep`。
+   - 也可以 `MN_EP_BACKEND=deepep` 配 `MN_EP_LIBS=deepep`。两者是 DeepEP 仓库的两个分支，Python 包同名，一个 venv 里只能装一个：`MN_EP_LIBS` 里写两个时只编第一个；换另一个要重新编，原来那个随之失效。
    - H100 能用：titan 的 CI 在 H100 上跑 HybridEP（单节点，`tests/integration_tests/h100.py`）；Megatron Core 的论文（arXiv 2603.07685）给了 H100 上 EP 32、64 跨节点的数据。titan 代码里写的"GB200 NVLink72"是它的主要目标，不是要求。
    - 风险在跨节点那条路：它要 GPU 直接发 RDMA，网卡要支持原子操作；DeepEP 一类的库通常还依赖宿主机上 NVIDIA 驱动的设置，pod 里改不了。第一次跑这一行可能失败，原因看那一格的 `node*.log`。
 6. **改 NCCL 源码**：`bash $K8S build nccl <ref> <patch>`，然后在矩阵行里加 `MN_NCCL_LIB=<目录>/lib/libnccl.so.2`。

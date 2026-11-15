@@ -3,7 +3,8 @@
 #   ext_build.sh nccl [ref] [patch]  NCCL at a git ref (default: the version torch bundles, so the first swap changes
 #                                    nothing), optionally patched, plus NCCL's example tuner and profiler plugins, into
 #                                    $B/nccl/<ref>[-<patch>]/{lib,plugins}; runs pick it with MN_NCCL_LIB=<dir>/lib/libnccl.so.2
-#   ext_build.sh hybridep | deepep   DeepEP's hybrid-ep branch or DeepEP v2, at titan CI's pinned commits, into the venv
+#   ext_build.sh hybridep | deepep   DeepEP's hybrid-ep branch or DeepEP v2, at titan CI's pinned commits, into the venv;
+#                                    both install the package deep_ep, so the venv holds one of them at a time
 # Extensions build with the CUDA toolkit torch was built with; the container's is older, so the matching one is
 # installed from NVIDIA's apt repository once and kept at $B/cuda-<version>.
 . "$(dirname "$0")/env.sh"
@@ -38,6 +39,7 @@ case ${1:-} in
     echo "built: MN_NCCL_LIB=$OUTD/lib/libnccl.so.2; plugins in $OUTD/plugins: $(ls $OUTD/plugins | tr '\n' ' ')"
     ;;
   hybridep | deepep)
+    rm -f $B/EXT_OK_hybridep $B/EXT_OK_deepep $B/EXT_FAIL_hybridep $B/EXT_FAIL_deepep
     apt-get install -y --no-install-recommends libibverbs-dev rdma-core libmlx5-1
     uv pip install "nvidia-nvshmem-cu${CUV%%.*}" || true
     D=$B/ext_src/$1
