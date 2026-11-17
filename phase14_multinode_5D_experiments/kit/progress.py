@@ -48,7 +48,13 @@ def cell_line(run_dir: Path) -> str:
     steps = [STEP.search(x).group(0) for x in lines if STEP.search(x)]
     if steps:
         return re.sub(r"\s+", " ", steps[-1])[:150]
-    return ("no step yet: " + lines[-1][-130:]) if lines else "no log yet"
+    if not lines:
+        return "no log yet"
+    told = [x for x in lines if re.search(r"\[titan\]|AUTOTUNE|multinode_5d|Error|Traceback", x)] or lines
+    errors = sum("Traceback" in x for x in lines)
+    since = time.strftime("%H:%M", time.localtime((run_dir / "node0.log").stat().st_mtime))
+    return (f"no step yet (initializing or compiling the first step; log written {since}"
+            + (f", {errors} tracebacks" if errors else "") + "): " + told[-1][-110:])
 
 
 def show(s: Path) -> None:
