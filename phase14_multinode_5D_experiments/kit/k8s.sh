@@ -3,7 +3,8 @@
 # from your own machine; kubectl must point at the cluster. The pods run the pipeline by themselves (bootstrap.sh,
 # pipeline.py).
 #   k8s.sh apply <2|4|8> [rows] [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes;
-#                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer)
+#                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer); MN_COMPILE=1 or 0
+#                              in your environment sets the manifest's MN_COMPILE (1 compiles every row)
 #   k8s.sh status              pods, setup, both heartbeats, the last pipeline decisions, REPORT.txt once finished
 #   k8s.sh logs [n]            last n (30) pipeline log lines of both nodes
 #   k8s.sh shell <0|1>         interactive shell in pod 0 or 1
@@ -32,7 +33,8 @@
 #                              communication by process group / idle from the traces, InfiniBand rates
 #   k8s.sh trace <stage> <row> [dir]   one cell's ranks merged into one trace in dir, for ui.perfetto.dev
 #   k8s.sh tb [stage]          TensorBoard of a stage (measure) on pod 0, forwarded to localhost:6006
-#   k8s.sh fetch <path> [dir]  copy a file or directory under runs/ to dir (memory snapshots, raw traces)
+#   k8s.sh fetch <path> [dir]  copy a file or directory under runs/ to dir (memory snapshots, raw traces), in
+#                              MN_FETCH_JOBS (4) tar streams at once spread over the pods; then checks every file's size
 #   k8s.sh cell <stage> <row> [VAR=value ...]   one cell by hand on both pods, with the pipeline's settings for that
 #                              stage and row (plus overrides such as MN_SEQ=16384), into runs/<hw>/manual/<stage>/;
 #                              waits for it, printing the newest step, then prints its summary (stop the pipeline first)
@@ -114,10 +116,11 @@ case "${1:-status}" in
     manifest=${4:-$HERE/kit/together/p14_pods.yaml}
     rowsed=()
     [ "$rows" = __manifest__ ] || rowsed=(-e "/name: MN_ROWS/{n;s/value: .*/value: \"$rows\"/}")
+    [ -z "${MN_COMPILE:-}" ] || rowsed+=(-e "/name: MN_COMPILE/{n;s/value: .*/value: \"$MN_COMPILE\"/}")
     sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" \
       "${rowsed[@]}" "$manifest" | kubectl apply -f -
-    echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'");" \
-      "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
+    echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'")$(
+      [ -z "${MN_COMPILE:-}" ] || echo ", MN_COMPILE=$MN_COMPILE");" "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
   status)
     kubectl get pods -n "$NS" -l "job-name=$JOB" -o wide
     on "$(any)" "
@@ -248,10 +251,45 @@ case "${1:-status}" in
     echo "TensorBoard of ${2:-measure} on $p: open http://localhost:6006 (ctrl-c ends the forward)"
     kubectl port-forward -n "$NS" "$p" 6006:6006 ;;
   fetch)
+    src=${2:?path under runs/}
     dest=${3:-.}
     mkdir -p "$dest"
-    kubectl exec -n "$NS" "$(any)" -- tar -C $RUNS -cf - "${2:?path under runs/}" | tar -C "$dest" -xf -
-    echo "copied $2 to $dest" ;;
+    # One kubectl exec stream carried about 20 MB/s on 11-08; the files are split by size over several streams.
+    lists=$(mktemp -d)
+    on "$(any)" "cd $RUNS && find '$src' -type f -printf '%s %p\n'" | LC_ALL=C sort > "$lists/remote"
+    [ -s "$lists/remote" ] || { echo "nothing under $RUNS/$src" >&2; rm -rf "$lists"; exit 1; }
+    # Files already in dest at the pod's size are skipped, so a rerun resumes an interrupted fetch.
+    (cd "$dest" && find "$src" -type f -printf '%s %p\n' 2> /dev/null || true) | LC_ALL=C sort > "$lists/local"
+    LC_ALL=C comm -23 "$lists/remote" "$lists/local" > "$lists/todo"
+    sort -nr "$lists/todo" | awk -v n="${MN_FETCH_JOBS:-4}" -v d="$lists" '{
+        i = 0; for (k = 1; k < n; k++) if (s[k] < s[i]) i = k
+        s[i] += $1; sub(/^[0-9]+ /, ""); print > (d "/part" i) }'
+    read -r nfiles gb < <(awk '{ t += $1 } END { printf "%d %.2f\n", NR, t / 1e9 }' "$lists/remote")
+    read -r ntodo gb < <(awk '{ t += $1 } END { printf "%d %.2f\n", NR, t / 1e9 }' "$lists/todo")
+    echo "fetching $ntodo of $nfiles files, $gb GB, in $(ls "$lists"/part* 2> /dev/null | wc -l) streams"
+    mapfile -t ps < <(pods)
+    start=$SECONDS
+    k=0
+    pids=()
+    for part in $(ls "$lists"/part* 2> /dev/null); do
+      (kubectl exec -i -n "$NS" "${ps[$((k % ${#ps[@]}))]}" -- tar -C $RUNS -cf - -T - < "$part" | tar -C "$dest" -xf -) &
+      pids+=($!)
+      k=$((k + 1))
+    done
+    failed=0
+    for pid in "${pids[@]}"; do wait "$pid" || failed=$((failed + 1)); done
+    secs=$((SECONDS - start))
+    (cd "$dest" && find "$src" -type f -printf '%s %p\n') | LC_ALL=C sort > "$lists/local"
+    missing=$(LC_ALL=C comm -23 "$lists/remote" "$lists/local" | wc -l)
+    echo "copied $src to $dest in ${secs} s ($(awk -v g="$gb" -v s="$secs" 'BEGIN { printf "%.0f", g * 1000 / (s ? s : 1) }') MB/s);" \
+      "$((nfiles - missing))/$nfiles files match the pod's size, $failed failed streams"
+    if [ "$missing" -ne 0 ]; then
+      echo "missing or of another size (a file still being written, such as the monitor CSVs, differs too);" \
+        "the same fetch again copies only these:"
+      LC_ALL=C comm -23 "$lists/remote" "$lists/local" | head -n 20
+    fi
+    rm -rf "$lists"
+    [ "$missing" -eq 0 ] ;;
   cell)
     stage=${2:?stage: smoke, probe, warm or measure}
     row=${3:?row of matrix_k3.tsv or matrix_m3.tsv, such as k3_5d}

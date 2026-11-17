@@ -11,8 +11,10 @@ with its state; a run whose peer (any other node) died or moved on is killed and
 failure. The matrix is matrix_<model>.tsv on 2 nodes and matrix_<model>_n<NNODES>.tsv on 4 or 8. A probe that
 runs out of memory retries at half the length; warm and measure use the length the probe settled on. Probe stores a
 memory snapshot at step 2 (MN_MEMSNAP_PROBE, empty for none); measure writes TensorBoard metrics and a profiler trace;
-at the end node 0 writes the stage summaries, the monitor summary, the NCCL variant comparison, the measure trace
-report and the paired comparison of pairs_<model>[_n<NNODES>].tsv (compare_pairs.py).
+at the end node 0 writes REPORT.txt (every task's outcome; for a measure cell how many ranks' traces read back
+whole), the stage summaries, the monitor summary, the NCCL variant comparison, the measure trace report
+(MN_TRACE_JOBS processes, 32 or the CPU count) and the paired comparison of pairs_<model>[_n<NNODES>].tsv
+(compare_pairs.py).
 
 Environment (bootstrap.sh exports env.sh's variables): MN_MODELS ("k3 m3"), MN_STAGES ("smoke probe warm measure"),
 MN_ROWS (only these matrix rows; +<tag> selects the rows a matrix tags so, +all every row but the +optional ones,
@@ -20,6 +22,7 @@ which is also what empty means), MN_ORDER (row | stage), MN_MAX_FAILS (2), MN_MI
 PROFILE_FREQ, MN_FLAVOR_OVERRIDE. $B/STOP stops every node once the current attempt is over.
 """
 
+import gzip
 import json
 import os
 import re
@@ -29,6 +32,7 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ENV = os.environ
@@ -573,19 +577,48 @@ def follow(t: dict, idx: int) -> None:
         time.sleep(5)
 
 
+def whole(path: Path) -> bool:
+    """A gzip trace reads to its end (a rank killed while writing leaves it truncated)."""
+    if path.suffix != ".gz":
+        return path.stat().st_size > 0
+    try:
+        with gzip.open(path, "rb") as f:
+            while f.read(1 << 24):
+                pass
+        return True
+    except (OSError, EOFError):
+        return False
+
+
+def trace_status(t: dict, pool: ThreadPoolExecutor) -> str:
+    """'traces 16/16' for a measure cell: the ranks whose trace of the last profiled step reads back whole."""
+    root = run_dir(t) / "tt" / "profiling" / "traces"
+    steps = sorted((p for p in root.glob("iteration_*") if p.name.split("_")[-1].isdigit()),
+                   key=lambda p: int(p.name.split("_")[-1]))
+    files = steps[-1].glob("rank*_trace.json*") if steps else []
+    files = sorted(files, key=lambda f: int(re.search(r"rank(\d+)", f.name).group(1)))
+    bad = [f.name.split("_")[0] for f, ok in zip(files, pool.map(whole, files)) if not ok]
+    world = NNODES * int(ENV.get("NPROC", "8"))
+    return f" traces {len(files) - len(bad)}/{world}" + (f" (unreadable: {' '.join(bad)})" if bad else "")
+
+
 def finish(tasks: list[dict]) -> None:
     lines = []
+    pool = ThreadPoolExecutor(16)
     for t in tasks:
         tid = t["id"]
         if mark("done", tid).exists():
             status = "done"
             if t["kind"] == "cell" and t["stage"] != "smoke":
                 status += f" seq {read(mark('len', t['model'] + '.' + t['name'])) or current_seq(t)}"
+            if t["kind"] == "cell" and t["stage"] == "measure":
+                status += trace_status(t, pool)
         elif mark("giveup", tid).exists():
             status = "GIVE UP: " + (read(mark("giveup", tid)) or "")
         else:
             status = "not run"
         lines.append(f"{tid}\t{status}")
+    pool.shutdown()
     write(S / "REPORT.txt", "\n".join(lines) + "\n")
     for stage_dir in sorted((OUT / HW).iterdir()):
         if stage_dir.is_dir() and any(stage_dir.glob("*/node0.log")):
@@ -595,8 +628,11 @@ def finish(tasks: list[dict]) -> None:
         subprocess.call([sys.executable, str(K / "monitor.py"), "--summary"], stdout=f, stderr=subprocess.STDOUT)
         subprocess.call([sys.executable, str(K / "comm_compare.py"), str(OUT / HW)], stdout=f, stderr=subprocess.STDOUT)
         if (OUT / HW / "measure").is_dir():
+            # Each process holds one parsed trace: 8 GB for an 11-08 H100 rank's 110 MB trace, about 40 s each.
+            jobs = ENV.get("MN_TRACE_JOBS") or str(min(32, os.cpu_count() or 8))
             subprocess.call(
-                [sys.executable, str(K / "trace_report.py"), str(OUT / HW / "measure")], stdout=f, stderr=subprocess.STDOUT
+                [sys.executable, str(K / "trace_report.py"), str(OUT / HW / "measure"), "--jobs", jobs],
+                stdout=f, stderr=subprocess.STDOUT,
             )
             for m in {t["model"] for t in tasks if t["kind"] == "cell"}:
                 pairs = K / matrix_path(m).name.replace("matrix_", "pairs_")

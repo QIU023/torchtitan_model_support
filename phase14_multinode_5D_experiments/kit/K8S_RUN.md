@@ -16,7 +16,7 @@
 - **断点续跑：** 状态放在共享存储的 `<BASE>/runs/<hw>/pipeline/` 下。pod 被抢占、重建以后，从第一个没完成的任务接着跑；被打断的那次尝试不计入失败。
 - **自动调长度：** probe 遇到 OOM 时把长度减半重试（最低 4096），warm 和 measure 用 probe 最后定下的长度。这一行没有 probe 任务时（快速路径），warm 和 measure 自己在 OOM 后减半重试。
 - **失败处理：** 一格连续真失败 2 次（`MN_MAX_FAILS`），就放弃这一格，同时跳过它后面的阶段，继续下一格。
-- **收尾：** 写出 `REPORT.txt`、每个阶段的 `summary.tsv`、采样汇总、measure 的 trace 报告（第 4 节）、成对对照 `pairs_report_<model>.tsv` 和 `ALL_DONE`。pod 不退出，方便收集结果。
+- **收尾：** 写出 `REPORT.txt`（每个 measure 格附 `traces n/N`：能完整解压的 rank 数）、每个阶段的 `summary.tsv`、采样汇总、measure 的 trace 报告（第 4 节）、成对对照 `pairs_report_<model>.tsv` 和 `ALL_DONE`。pod 不退出，方便收集结果。
 
 ## 2. 手动操作（本机，在 logbook 根目录下）
 

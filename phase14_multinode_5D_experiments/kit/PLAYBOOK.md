@@ -65,7 +65,7 @@ bash $K8S watch 5         # 终端版：16 张卡的 DCGM 和正在跑的那一�
 R=phase14_multinode_5D_experiments/results/<日期>_h100_together
 bash $K8S report                    # measure 每格一行的时间拆分（trace_report*.tsv）
                                     # measure/pairs_report_k3.tsv：成对对照的差值和噪声底线（第 4.4 节）
-bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace（11-08 是 7.4 GB），raw/ 不进 git
+bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace（11-08 是 7.4 GB），raw/ 不进 git；第 4.4 节
 ```
 
 拉回本机以后的分析（第 6.2 节）不需要集群，确认 `raw/` 完整以后就可以删集群。
@@ -94,7 +94,8 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
   - 每行 5 到 10 分钟；16K 放不下的行会自动减半重跑，每次多几分钟；
   - `+core`：4 节点 7 行、8 节点 7 行，各约 50 分钟到 1 小时；整个矩阵各 12 行左右，约 1.5 小时；
   - 32 卡每小时约 $64，64 卡约 $128；
-  - 余额门槛按卡数涨：抢占式目标 4 小时，32 卡约 $256，64 卡约 $511。
+  - 余额门槛按卡数涨：抢占式目标 4 小时，32 卡约 $256，64 卡约 $511；
+  - 收尾也按卡数涨：trace 每个 rank 每格 40 到 110 MB（11-08，eager），整个矩阵 16 卡约 13 GB、32 卡约 26 GB、64 卡约 53 GB。下载期间 GPU 照样计费，按 11-08 单路约 20 MB/s 要 11、22、44 分钟；`fetch` 默认 4 路并行（第 4.4 节）。
 - **还没在真集群上跑过：** N 个节点的协同只在本机模拟过。8 节点下，正常完成、OOM 减半、杀 follower、杀 leader、STOP 都通过了。
 
 ### 0.2 B300（Nebius）
@@ -169,6 +170,8 @@ bash $K8S status
 5. **tokenizer**（约 2 分钟）。K3 的转换失败时，自动退到 Qwen3 的 tokenizer。
 6. **矩阵的每一行跑一次 measure**：缩小版模型，c4，16K，5 步，第 5 步所有 rank 写 trace，TensorBoard。每步约 512K token，随机初始化，AdamW，fp32 主参数加 bf16 计算。这是吞吐和通信的测量，不是真训练。OOM 的行减半重跑，失败两次的行放弃，流水线接着跑下一行。
 7. **收尾：** 写 `measure/summary.tsv`、`monitor_summary.tsv`、measure 的 `trace_report*.tsv`、成对对照 `measure/pairs_report_k3.tsv`、`REPORT.txt` 和 `ALL_DONE`。之后 pod 空转，但照样计费。
+   - `REPORT.txt` 每个 measure 格写着 `traces 16/16`：最后一个 profile 步里能完整解压的 rank 数 / 总 rank 数，读不了的 rank 列在后面。不等于总 rank 数的格要在删集群之前重跑；
+   - `trace_report.py` 开 `MN_TRACE_JOBS` 个进程（默认 32 和 CPU 数取小）。每个进程装一份解析后的 trace，11-08 一个 110 MB 的 H100 trace 占 8 GB 内存；11-08 本机 8 个进程每个 trace 约 40 秒（解析 18 秒加分析），按这个算 64 卡整个矩阵约 700 个 trace、32 个进程约 15 分钟。
 
 被抢占时，换上来的 pod 会从第一个没完成的任务接着跑，被打断的那次不算失败（`K8S_RUN.md` 第 5 节）。
 
@@ -181,7 +184,7 @@ bash $K8S status
 | `MN_STAGES` | `smoke probe warm measure` | 每行四个阶段（下表） |
 | `MN_COMM` | `1` | 第一个任务是通信检查（第 7.2 节），矩阵跑完后做 NCCL 调优扫描（第 7.3 节，约 20 分钟；`MN_COMM_SWEEP=0` 单独关掉扫描） |
 | `MN_SEQ_FORCE` | 删掉 | 用矩阵里每种卡的长度，probe 定下每行能放下的长度 |
-| `MN_COMPILE` | `1`（或删掉） | 所有行都编译局部区域，flex attention autotune；MFU 是调过的口径，每种布局多十几分钟冷编译。`launch.sh` 自动把初始化和第 1 步的 NCCL 超时抬到 1800 秒；矩阵里只开 compile 的那一行（`k3_A_compile` 等）这时和 `k3_A` 重复，会被跳过 |
+| `MN_COMPILE` | `1`（或删掉；也可以不改清单，`MN_COMPILE=1 bash $K8S apply ...`） | 所有行都编译局部区域，flex attention autotune；MFU 是调过的口径，每种布局多十几分钟冷编译。`launch.sh` 自动把初始化和第 1 步的 NCCL 超时抬到 1800 秒；矩阵里只开 compile 的那一行（`k3_A_compile` 等）这时和 `k3_A` 重复，会被跳过 |
 | `MEAS_STEPS`、`PROFILE_FREQ` | 删掉 | 30 步，第 25 步出 trace |
 
 | 阶段 | 模型 | 数据 | 步数 | 顺带记录 |
@@ -211,8 +214,13 @@ bash $K8S status
 
 ### 4.4 跑完以后（`ALL_DONE`）
 
-1. `bash $K8S report`：measure 每格一行的时间拆分。再看 `measure/pairs_report_k3.tsv`：每一对的干净步时间（`summary.tsv` 的 `step_s_clean`，去掉第 1 步和录 trace 的那一步）、差多少百分比、有没有超出噪声底线（`k3_A` 和 `k3_A_rep` 的差），最后一列留给你写一句结论。两格长度不同（比如一格 OOM 减半了）时不给差值，直接注明。
-2. `bash $K8S fetch h100 $R/raw`：整份拉回本机（日志、trace、TensorBoard、NCCL 日志、监控）。再把共享卷顶层的 setup、流水线、采样器日志和 `scope.env` 拉进 `$R/raw/top/`：
+1. `bash $K8S status` 打印的 `REPORT.txt`：每个 measure 格的 `traces n/N` 都应该是满的（比如 64 卡 `traces 64/64`），不满的格趁集群还在重跑（`bash $K8S cell measure <行>`）。`bash $K8S report`：measure 每格一行的时间拆分。再看 `measure/pairs_report_k3.tsv`：每一对的干净步时间（`summary.tsv` 的 `step_s_clean`，去掉第 1 步和录 trace 的那一步）、差多少百分比、有没有超出噪声底线（`k3_A` 和 `k3_A_rep` 的差），最后一列留给你写一句结论。两格长度不同（比如一格 OOM 减半了）时不给差值，直接注明。
+2. `bash $K8S fetch h100 $R/raw`：整份拉回本机（日志、trace、TensorBoard、NCCL 日志、监控）。
+   - 不是 scp：每一路是 pod 里 `tar` 打成一个流，经 `kubectl exec` 传到本机再解开，所以小文件多不影响速度。11-08 一路约 20 MB/s，7.4 GB、514 个文件用了 6 到 7 分钟；
+   - 不压缩：trace 已经是 `.json.gz`，占 11-08 总量的约 80%；剩下的显存快照和 structured log 再压一遍，最多省一成；
+   - 文件按大小分成 `MN_FETCH_JOBS`（默认 4）份，几路同时传，轮流从不同的 pod 读。4 路能不能比 1 路快 4 倍没测过，取决于 API server 和本机的带宽，看结尾打印的 MB/s；
+   - 传完逐个比对文件大小，打印 `n/N files match`。有缺的，再跑同一条命令只补缺的和大小不对的文件。还在写的文件（采样器的 CSV）大小总会对不上，可以忽略。
+   再把共享卷顶层的 setup、流水线、采样器日志和 `scope.env` 拉进 `$R/raw/top/`：
 
    ```sh
    mkdir -p $R/raw/top
@@ -221,7 +229,7 @@ bash $K8S status
    ```
 
 3. 本机检查每个 trace 能不能读、出报告、合成 trace（第 6.2 节），写 `$R/README.md`。
-4. 确认 `raw/` 完整（文件数和大小与共享卷一致）后，在控制台删集群（第 8 节）。
+4. `fetch` 打印 `N/N files match`（除了还在写的采样器 CSV）后，在控制台删集群（第 8 节）。
 
 **不要在 rank 写 trace 时杀进程。** 最后一步之后每个 rank 要花 1 分钟以上写 trace，这时杀掉会留下截断、读不了的文件。11-08 的 4096 那次 `k3_5d` measure 就是这样丢了全部 16 个 trace。`bash $K8S kill` 现在会在还有 rank 在写 trace 时拒绝执行（`kill force` 强制）。
 
@@ -385,7 +393,7 @@ bash $K8S fetch h100 $R/raw       # 整份拉回本机（含 trace），之后�
 本机分析（集群删掉以后也能做；`M=$R/raw/h100/measure`，手动跑的格子在 `$R/raw/h100/manual/measure`）：
 
 ```sh
-for f in $M/*/tt/profiling/traces/*/rank*_trace.json.gz; do gzip -t $f || echo "truncated: $f"; done
+for f in $M/*/tt/profiling/traces/*/rank*_trace.json.gz; do gzip -t $f || echo "truncated: $f"; done   # 集群上的同一检查在 REPORT.txt 里
 python phase14_multinode_5D_experiments/kit/trace_report.py $M --jobs 4     # 写 $M/trace_report*.tsv
 python phase14_multinode_5D_experiments/kit/summarize.py $M > $R/measure_summary.tsv
 python phase14_multinode_5D_experiments/kit/merge_traces.py $M/<格> --out $R/<格>_measure_trace.json.gz   # 拖进 ui.perfetto.dev
