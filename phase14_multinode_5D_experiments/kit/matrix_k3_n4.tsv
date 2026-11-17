@@ -22,5 +22,5 @@ k3_E4_ep16	pp=2,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e25
 k3_E4_ep16_hybridep	pp=2,dp=2,cp=2,tp=4,ep=16	16384	16384	16384	MN_FLAVOR=k3_32x{mem}_e256 MN_EP_BACKEND=hybridep +optional +ep_backend
 # Long context: CP 4 x TP 4 spans two nodes, no PP, four sequences of 64K per step.
 k3_L4	dp=2,cp=4,tp=4,ep=8	65536	65536	65536	MN_SEQ=65536 MN_FSDP_KEEP=1 +core
-# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume); a cold compile in step 1 can outlast the 300 s first-step NCCL timeout, hence 1800 s.
-k3_A4_compile	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_COMPILE=1 MN_NCCL_INIT_TIMEOUT=1800
+# The main layout compiled (local regions and flex autotuning; the cache stays on the shared volume); launch.sh raises the first-step NCCL timeout for it.
+k3_A4_compile	pp=4,dp=2,tp=4,ep=8	16384	16384	16384	MN_COMPILE=1

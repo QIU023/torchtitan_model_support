@@ -2,7 +2,7 @@
 # Raw RDMA write bandwidth of every active InfiniBand port between the two nodes, without NCCL: perftest's
 # ib_write_bw in host memory, node 1 writing to node 0, one port after the other (port k of node 1 to port k of node 0).
 # run_comm.sh calls it on both nodes at once before the NCCL measurement; node 0 serves, node 1 connects to MASTER_ADDR.
-# Node 1 writes one line per port to rdma_node1.txt in MN_COMM_DIR ($OUT/$HW/comm); the raw output is in rdma_<hca>_node<k>.log.
+# Node 1 writes one line per port to rdma_node1.txt in MN_COMM_DIR ($OUT/$HW/comm), with the port's link rate; the raw output is in rdma_<hca>_node<k>.log.
 . "$(dirname "$0")/env.sh"
 set -u
 command -v ib_write_bw > /dev/null || { echo "ib_write_bw not installed (perftest), skipped"; exit 0; }
@@ -26,7 +26,8 @@ for dev in /sys/class/infiniband/*; do
       sleep 3
       timeout 60 ib_write_bw -d $hca -p $port -D 5 -F --report_gbits $MASTER_ADDR > $log 2>&1 && break
     done
-    echo "$hca $(awk '$1 ~ /^[0-9]+$/ && NF >= 5 { bw = $4 } END { print (bw ? bw " Gb/s" : "failed") }' $log)" >> $out
+    link=$(grep -oE '^[0-9]+' $dev/ports/1/rate 2>/dev/null || echo 0)
+    echo "$hca $(awk '$1 ~ /^[0-9]+$/ && NF >= 5 { bw = $4 } END { print (bw ? bw " Gb/s" : "failed") }' $log) link $link" >> $out
   fi
   port=$((port + 1))
 done

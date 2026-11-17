@@ -1,5 +1,5 @@
 # Paths and per-hardware settings of the phase 14 kit, sourced by every script (assignments and exports only).
-# HW: h100 | h200 (also B200) | a100 | generic. Every node needs the same layout under $B (each pod has its own copy).
+# HW: h100 | h200 (also B200) | b300 | a100 | generic. Every node needs the same layout under $B (each pod has its own copy).
 HW=${HW:-h100}
 B=${MN_BASE:-$HOME/p14}
 V=$B/venv
@@ -11,7 +11,7 @@ NNODES=${NNODES:-2}
 NPROC=${NPROC:-8}
 OUT=${MN_OUT:-$B/runs$([ "$NNODES" = 2 ] || echo "_n$NNODES")}
 BRANCH=phase14_multinode_5d
-BRANCH_SHA=8821ccca2
+BRANCH_SHA=6f501de2e
 TORCH_NIGHTLY=2.16.0.dev20261024
 TORCHVISION_NIGHTLY=0.30.0.dev20261024
 MASTER_PORT=${MASTER_PORT:-29500}
@@ -29,15 +29,18 @@ case $HW in
   h100) MEM=80g; GATE=fused ;;
   # B200 (180 GB) takes the 141 GB downscales and lengths.
   h200|b200) MEM=141g; GATE=fused ;;
+  # B300 (270 GB on Nebius): the wider 270 GB downscales at the H200 lengths.
+  b300) MEM=270g; GATE=fused ;;
   # A100: the fused bounded KDA gate needs sm90; no NVLS on the A100 NVSwitch.
   a100) MEM=80g; GATE=reference; export NCCL_NVLS_ENABLE=0 ;;
   # Any other card (e.g. 8x RTX 5090 on a vast overlay): smoke and communication only; the downscales need 80 GB.
   # M3's full-attention layers move to flex there: the M3 5060 kit needed a shim to keep varlen off FlashAttention on sm120.
   generic) MEM=80g_small; GATE=reference; export MN_ATTN=${MN_ATTN:-flex} ;;
-  *) echo "HW must be h100, h200, b200, a100 or generic, got $HW" >&2; return 1 2>/dev/null || exit 1 ;;
+  *) echo "HW must be h100, h200, b200, b300, a100 or generic, got $HW" >&2; return 1 2>/dev/null || exit 1 ;;
 esac
 case $NNODES in
-  2) FLAVOR_k3=k3_16x$MEM; FLAVOR_m3=m3_16x$MEM ;;
+  # M3 has no 270 GB downscale; on B300 it runs the 141 GB one.
+  2) FLAVOR_k3=k3_16x$MEM; FLAVOR_m3=m3_16x${MEM/270g/141g} ;;
   # 32 and 64 GPUs: K3 only, with the deeper downscales (matrix_k3_n4.tsv, matrix_k3_n8.tsv).
   4|8) FLAVOR_k3=k3_$((NNODES * NPROC))x$MEM; FLAVOR_m3=
     [ "$HW" != generic ] || { echo "HW=generic runs on 2 nodes only" >&2; return 1 2>/dev/null || exit 1; } ;;
@@ -45,21 +48,25 @@ case $NNODES in
 esac
 
 # MN_NET=nebius: a Nebius GPU cluster (pods or VMs); the settings of Nebius's own NCCL test (docs.nebius.com,
-# kubernetes/gpu/nccl-test): bootstrap on eth0, data on the mlx5 InfiniBand HCAs.
-# MN_NET=together: a Together GPU cluster; its docs give no NCCL settings, so bootstrap on the pod's eth0 and hand NCCL
-# only the InfiniBand ports: the 2026-11-08 H100 nodes also had two 200G RoCE front-end ports (mlx5_4, mlx5_5).
+# kubernetes/gpu/nccl-test): bootstrap on eth0, data on the InfiniBand HCAs.
+# MN_NET=together: a Together GPU cluster; its docs give no NCCL settings, so bootstrap on the pod's eth0.
+# Both hand NCCL only the ports whose link layer is InfiniBand (an exact list): the 2026-11-08 Together H100 nodes
+# also had two 200G RoCE front-end ports, and Nebius B300 nodes carry a BlueField-3 front-end adapter, both mlx5.
+ib_hcas() {
+  local p list
+  list=$(for p in /sys/class/infiniband/*/ports/1; do
+    [ "$(cat $p/link_layer 2>/dev/null)" = InfiniBand ] && basename $(dirname $(dirname $p)); done | paste -sd, -)
+  [ -z "$list" ] || echo "=$list"
+}
 case "${MN_NET:-}" in
   nebius)
     MN_IFNAME=${MN_IFNAME:-eth0}
+    MN_IB_HCA=${MN_IB_HCA:-$(ib_hcas)}
     MN_IB_HCA=${MN_IB_HCA:-mlx5}
     export UCX_NET_DEVICES=${UCX_NET_DEVICES:-eth0} SHARP_COLL_ENABLE_PCI_RELAXED_ORDERING=1 NCCL_COLLNET_ENABLE=0 ;;
   together)
     MN_IFNAME=${MN_IFNAME:-eth0}
-    if [ -z "${MN_IB_HCA:-}" ]; then
-      MN_IB_HCA=$(for p in /sys/class/infiniband/*/ports/1; do
-        [ "$(cat $p/link_layer 2>/dev/null)" = InfiniBand ] && basename $(dirname $(dirname $p)); done | paste -sd, -)
-      [ -z "$MN_IB_HCA" ] || MN_IB_HCA="=$MN_IB_HCA"
-    fi ;;
+    MN_IB_HCA=${MN_IB_HCA:-$(ib_hcas)} ;;
 esac
 
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}

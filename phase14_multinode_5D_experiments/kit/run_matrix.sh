@@ -27,7 +27,7 @@ row=0
 while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   [[ "$ONLY" != "  " && "$ONLY" != *" $name "* ]] && continue
-  case $HW in h100) seq=$s_h100 ;; h200|b200) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
+  case $HW in h100) seq=$s_h100 ;; h200|b200|b300) seq=$s_h200 ;; *) seq=$s_a100 ;; esac
   seq=${MN_SEQ_FORCE:-$seq}
   # Both nodes walk the same rows, so each cell gets the same fresh rendezvous port on both.
   row=$((row + 1))
@@ -44,9 +44,9 @@ while IFS=$'\t' read -r name cell s_h100 s_h200 s_a100 extra; do
       +*) ;;
       MN_FLAVOR=*) flavor=${item#MN_FLAVOR=}; flavor=${flavor//\{mem\}/$MEM} ;;
       MN_SEQ=*) seq=${item#MN_SEQ=} ;;
-      # b200 runs the h200 lengths, so it also takes the h200-only variables.
+      # b200 and b300 run the h200 lengths, so they also take the h200-only variables.
       *:*) tag=${item%%:*}
-           if [ "$tag" = $HW ] || { [ $HW = b200 ] && [ "$tag" = h200 ]; }; then envs+=("${item#*:}"); fi ;;
+           if [ "$tag" = $HW ] || { { [ $HW = b200 ] || [ $HW = b300 ]; } && [ "$tag" = h200 ]; }; then envs+=("${item#*:}"); fi ;;
       *) envs+=("$item") ;;
     esac
   done

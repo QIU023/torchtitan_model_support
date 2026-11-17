@@ -1,7 +1,7 @@
 # Phase 14 on a Together GPU cluster (Kubernetes): one pod per 8-GPU node, 2, 4 or 8 of them, all mounting the
 # cluster's shared volume (together/README.md). Apply with kit/k8s.sh apply <2|4|8>, which sets the node count below.
 # Before applying: set volumeName to your shared volume's name (kubectl get pv; Together creates a static PV with the
-# same name as the shared volume), HW (h100 / h200 / b200) and the MN_* settings.
+# same name as the shared volume), HW (h100 / h200 / b200 / b300) and the MN_* settings.
 # Each pod clones the kit onto the shared volume once, then runs kit/bootstrap.sh: packages, the shared setup, and
 # the unattended pipeline, which resumes where it stopped after a preemption (state on the shared volume). The
 # Indexed Job gives the pods JOB_COMPLETION_INDEX (the node rank) and hostnames p14-0, p14-1, ...; the headless
@@ -97,6 +97,8 @@ spec:
           value: "0"
         - name: MN_SEQ_FORCE
           value: "16384"
+        # "1" compiles every row (a cold compile per layout; launch.sh raises the first-step NCCL timeout), "0" runs
+        # eager; with "1" the rows that only switch compile on are skipped.
         - name: MN_COMPILE
           value: "0"
         - name: MN_VPP

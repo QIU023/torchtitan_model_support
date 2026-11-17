@@ -6,6 +6,7 @@
 - `PRACTICE_PLAN.md`：模拟文档和真机演练怎么配合，16 / 32 / 64 卡的练习顺序；
 - `TRACE_READING.md`：读懂 trace 的练习册，从时间线结构到 kernel 内部；
 - `together/README.md`：建集群、kubeconfig、IB 排查；
+- `nebius/README.md`：Nebius 上建 GPU cluster 和 node group，B300 和已经跑过的卡有什么不同（第 0.2 节）；
 - `K8S_RUN.md`：运维细节、状态文件、report 各列的定义；
 - `RUNBOOK.md`：不用 k8s、在裸机或 VM 上手动跑的版本；
 - `README.md`：titan 分支、两个缩小版模型、矩阵的来由；
@@ -38,7 +39,7 @@ PK=/mnt/shared/p14/logbook/phase14_multinode_5D_experiments/kit    # pod 里 kit
 | `MN_STAGES` | `measure` | 只跑 measure。smoke 只证明布局能起来，probe 只量显存，warm 只填编译 cache；不编译、长度固定时这三步都用不上 |
 | `MN_COMM` | `0` | 不跑单独的通信检查。每次运行都把 NCCL 的 INFO 日志写进 `<格>/nccl/`，`summary.tsv` 的 `net` 列写着这一格走的是 `IB+GDR`、`IB` 还是 `Socket`；`0` 同时关掉 NCCL 调优扫描 |
 | `MN_SEQ_FORCE` | `16384` | 所有行用 16K；OOM 的行自动减半，最低 4096 |
-| `MN_COMPILE` | `0` | eager：K3 的局部编译区不编译，flex attention 不 autotune。每种布局省掉编译时间；MFU 偏低，但各行同口径，可以互相比 |
+| `MN_COMPILE` | `0` | eager：K3 的局部编译区不编译，flex attention 不 autotune。每种布局省掉编译时间；MFU 偏低，但各行同口径，可以互相比。改成 `1` 就是所有行都编译（第 4.2 节） |
 | `MN_VPP` | `2` | PP 的行用 `Interleaved1F1B`，每个 rank 2 个虚拟 stage（K3 80G 缩小版每个虚拟 stage 8 层） |
 | `MEAS_STEPS`、`PROFILE_FREQ` | `5`、`5` | 跑 5 步，第 5 步出 trace（profiler 的 warmup 3 步加 active 1 步正好放得下） |
 | `MN_ROWS` | 空 | 矩阵里除 `+optional` 以外的每一行；只跑几行就写行名，用空格隔开；`+core` 这类写法选带这个标签的行 |
@@ -49,7 +50,7 @@ NCCL 超时清单不设，用 titan 的默认：初始化和第 1 步 300 秒，
 全部命令：
 
 ```sh
-# 本机：清单里填 volumeName（kubectl get pv 里和共享卷同名的那个）和 HW（h100 / h200 / b200）
+# 本机：清单里填 volumeName（kubectl get pv 里和共享卷同名的那个）和 HW（h100 / h200 / b200 / b300）
 tg clusters list
 tg clusters get-credentials <CLUSTER_ID> --set-default-context --no-json
 kubectl get pv
@@ -77,7 +78,7 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
   - 输出在共享卷的 `runs_n4/`、`runs_n8/`，和 2 节点的 `runs/` 分开，同一个卷上可以先后跑不同的节点数；
   - `k8s.sh` 按当前 Job 的节点数自动找对目录，`fetch`、`report`、`trace` 的用法和 2 节点一样。
 - **前提不变：** 每步 524,288 token，dp 2（或 1）。多出来的卡给跨节点的 PP 和更大的模型，TP、CP、EP 默认留在节点内（第 5.1 节）。
-- **模型：** 下表是 titan 分支 `c8c229b59` 加的 flavor，宽度和 16 卡的相同，每卡的参数量大致不变。H200 / B200 用对应的 `141g` 版本。
+- **模型：** 下表是 titan 分支 `c8c229b59` 加的 flavor，宽度和 16 卡的相同，每卡的参数量大致不变。H200 / B200 用对应的 `141g` 版本，B300 用 `270g` 版本（第 0.2 节）。
 
 | flavor | 层数 | 专家 | AttnRes block | 总参数（估） | 用在 |
 |---|---|---|---|---|---|
@@ -96,6 +97,29 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
   - 余额门槛按卡数涨：抢占式目标 4 小时，32 卡约 $256，64 卡约 $511。
 - **还没在真集群上跑过：** N 个节点的协同只在本机模拟过。8 节点下，正常完成、OOM 减半、杀 follower、杀 leader、STOP 都通过了。
 
+### 0.2 B300（Nebius）
+
+建资源和拉起 pod 见 `nebius/README.md`；清单 `nebius/p14_pods.yaml` 默认 `HW=b300`，其余是和 Together 相同的快速路径。和 H100 / H200 相比，kit 里变的只有下面这些：
+
+- **模型加宽，并行设置不变：** `HW=b300` 选 titan 分支 `6f501de2e` 加的 270g 缩小版（下表）。
+  - 层数、专家数、AttnRes block 数和 80g、141g 同名版本相同，所以矩阵每一行的 PP 切分、VPP、EP 都不变，只是每层更宽；
+  - 参数按 141g 版本的约 1.9 倍推算（每层的参数约 2 倍，词表那部分 1.43 倍），没在机器上数过；
+  - 每卡的 AdamW 状态约占 270 GB 的四分之一，和 141g 在 H200 上的比例相同，激活留的余量也相近；
+  - 不加宽的话，B300 上的 GEMM 太小，算力用不满，测出来的主要是 kernel 启动和通信；要和 H200 比同一个模型，单独补一格：`bash $K8S cell measure k3_A MN_FLAVOR=k3_16x141g`；
+  - M3 没有 270g 版本，2 节点时用 `m3_16x141g`。
+- **长度：** 和 H200 相同的长度表（矩阵里 `h200:` 开头的变量 B300 也用）；快速路径固定 16K。
+- **网络：** 每卡一个 800 Gb/s IB 口，另有一块 BlueField-3 前端网卡。`env.sh` 只把 link layer 是 InfiniBand 的口交给 NCCL。preflight 的阈值按链路速率换算（第 4.1 节），800G 上没实测过，所以清单里 `MN_PREFLIGHT=warn`。
+- **第一轮先只跑一行：** K3 的 kernel 在 sm_103 上没跑过。`bash $K8S apply 2 k3_A phase14_multinode_5D_experiments/kit/nebius/p14_pods.yaml` 跑通以后，再 `scope MN_ROWS=` 加 `retask` 放开整个矩阵（`nebius/README.md` 第 3 节）。
+- **MFU：** titan 把 B300 的 bf16 稠密峰值记成 2.25 PFLOPS，和 B200 相同。
+
+| flavor | 宽度 | 层数 / 专家 | 总参数（估） | AdamW 状态 / 卡（估） |
+|---|---|---|---|---|
+| `k3_16x270g` | D 5120，64 头，MLA 秩 1024/384，专家 2048，latent 2560，dense 24064 | 29 / 128 | 约 67B | 约 67 GB |
+| `k3_32x270g` | 同上 | 61 / 128 | 约 140B | 约 70 GB |
+| `k3_32x270g_e256` | 同上 | 29 / 256 | 约 120B | 约 60 GB |
+| `k3_64x270g` | 同上 | 93 / 128 | 约 210B | 约 53 GB |
+| `k3_64x270g_e512` | 同上 | 29 / 512 | 约 230B | 约 58 GB |
+
 ## 1. 开始前（本机）
 
 1. **余额：** 创建时余额要够"抢占式目标的 4 小时 + 按需部分的最短时长 + 同期存储"，16 卡约 $128 起，快速路径一轮充 $200 够用。余额用完，集群立刻暂停，宽限期后删除，而且扣完之前没有提醒。
@@ -105,7 +129,7 @@ bash $K8S fetch h100 $R/raw         # runs/h100 整份拉回本机，含 trace�
    - Windows 上所有 `bash $K8S ...` 都在 Git Bash 里跑，`k8s.sh` 已经关掉了 Git Bash 对 `/mnt/...` 参数的路径改写。
 3. **改清单** `phase14_multinode_5D_experiments/kit/together/p14_pods.yaml`，只有两处：
    - `volumeName`：共享卷对应的 PV 名，第 3 步查；
-   - `HW`：`h100`、`h200` 或 `b200`。控制台标价 $1.995/GPU·时的是 H100 抢占式。写错卡型会按另一种卡的缩小版和长度跑。
+   - `HW`：`h100`、`h200`、`b200` 或 `b300`。控制台标价 $1.995/GPU·时的是 H100 抢占式。写错卡型会按另一种卡的缩小版和长度跑。
 
 kit 支持 2、4、8 个节点（16、32、64 卡），4 和 8 节点见第 0.1 节。
 
@@ -141,7 +165,7 @@ bash $K8S status
 4. **开跑前筛查 `preflight`**（约 3 分钟，`preflight.py`、`preflight.sh`）：
    - 每个节点 8 张卡同时跑 30 秒 bf16 GEMM，记每张卡的 TFLOPS、SM 频率、温度、降频原因；
    - 再测一遍 256 MiB 以上的 all_reduce / alltoall 和每个 IB 口的 RDMA 原始带宽；
-   - 判定：某张卡低于所有卡中位数的 90%，或出现热降频、硬件降频（原因码 `0x8`、`0x20`、`0x40`、`0x80`）；NCCL 没走 IB 加 GDR、某个口低于 320 Gb/s、all_reduce busbw 低于 300 GB/s。任何一条不过关，流水线就停在矩阵之前，结论在 `runs/<hw>/preflight/VERDICT.txt`（`status` 和 dashboard 都会显示）。
+   - 判定：某张卡低于所有卡中位数的 90%，或出现热降频、硬件降频（原因码 `0x8`、`0x20`、`0x40`、`0x80`）；NCCL 没走 IB 加 GDR、某个口低于链路速率的 80%（400G 口是 320 Gb/s）、all_reduce busbw 低于每 400 Gb/s 链路 300 GB/s（800G 口是 600 GB/s，按比例推的，没实测）。任何一条不过关，流水线就停在矩阵之前，结论在 `runs/<hw>/preflight/VERDICT.txt`（`status` 和 dashboard 都会显示）。
 5. **tokenizer**（约 2 分钟）。K3 的转换失败时，自动退到 Qwen3 的 tokenizer。
 6. **矩阵的每一行跑一次 measure**：缩小版模型，c4，16K，5 步，第 5 步所有 rank 写 trace，TensorBoard。每步约 512K token，随机初始化，AdamW，fp32 主参数加 bf16 计算。这是吞吐和通信的测量，不是真训练。OOM 的行减半重跑，失败两次的行放弃，流水线接着跑下一行。
 7. **收尾：** 写 `measure/summary.tsv`、`monitor_summary.tsv`、measure 的 `trace_report*.tsv`、成对对照 `measure/pairs_report_k3.tsv`、`REPORT.txt` 和 `ALL_DONE`。之后 pod 空转，但照样计费。
@@ -157,7 +181,7 @@ bash $K8S status
 | `MN_STAGES` | `smoke probe warm measure` | 每行四个阶段（下表） |
 | `MN_COMM` | `1` | 第一个任务是通信检查（第 7.2 节），矩阵跑完后做 NCCL 调优扫描（第 7.3 节，约 20 分钟；`MN_COMM_SWEEP=0` 单独关掉扫描） |
 | `MN_SEQ_FORCE` | 删掉 | 用矩阵里每种卡的长度，probe 定下每行能放下的长度 |
-| `MN_COMPILE` | 删掉 | 编译局部区域，flex attention autotune；MFU 是调过的口径，每种布局多十几分钟编译 |
+| `MN_COMPILE` | `1`（或删掉） | 所有行都编译局部区域，flex attention autotune；MFU 是调过的口径，每种布局多十几分钟冷编译。`launch.sh` 自动把初始化和第 1 步的 NCCL 超时抬到 1800 秒；矩阵里只开 compile 的那一行（`k3_A_compile` 等）这时和 `k3_A` 重复，会被跳过 |
 | `MEAS_STEPS`、`PROFILE_FREQ` | 删掉 | 30 步，第 25 步出 trace |
 
 | 阶段 | 模型 | 数据 | 步数 | 顺带记录 |
@@ -205,7 +229,7 @@ bash $K8S status
 
 ### 5.1 矩阵
 
-度数按 `pp · dp · cp · tp · ep` 写，`dp` 是 FSDP 的分片度，M3 另有 `dpr`（HSDP 的副本数）。titan 的 mesh 从外到内是 `pp, dpr, dp, cp, tp`，每个节点 8 卡，所以最外层大于 1 的轴落在节点之间。长度一列依次是 H100 / H200（B200 同 H200）/ A100。
+度数按 `pp · dp · cp · tp · ep` 写，`dp` 是 FSDP 的分片度，M3 另有 `dpr`（HSDP 的副本数）。titan 的 mesh 从外到内是 `pp, dpr, dp, cp, tp`，每个节点 8 卡，所以最外层大于 1 的轴落在节点之间。长度一列依次是 H100 / H200（B200、B300 同 H200）/ A100。
 
 K3（`matrix_k3.tsv`）：
 
@@ -290,9 +314,9 @@ bash $K8S scope                                           # 不带参数：撤�
 - `MN_SEQ_FORCE=<n>`（清单或 `scope`）：所有行的 probe、warm、measure 都用这个长度，代替矩阵和 probe 定下的长度；没有 probe 的时候，warm 和 measure 自己在 OOM 后减半重试；
 - `MN_COMPILE=0`：K3 的局部编译区改成 eager，flex attention 不做 autotune（flex 不能完全不编译，长序列 eager 会 OOM）；省编译时间，但 kernel 没调优，MFU 偏低；
 - 任何 `NCCL_*` 变量（第 7.4 节）；
-- `MN_FLAVOR=k3_<卡数>x{mem}[_e<专家数>]`：这一行换一个 flavor，`{mem}` 按卡型换成 `80g` 或 `141g`；
+- `MN_FLAVOR=k3_<卡数>x{mem}[_e<专家数>]`：这一行换一个 flavor，`{mem}` 按卡型换成 `80g`、`141g` 或 `270g`；
 - `MN_SEQ=<n>`：固定这一行的长度，`MN_SEQ_FORCE` 不覆盖它（长上下文的行用）；
-- `MN_COMPILE=1`：这一行开 compile（清单默认 0）。同时加 `MN_NCCL_INIT_TIMEOUT=1800`：冷编译在第 1 步里可能超过 300 秒，先编完的 rank 会在第一个 collective 上等到超时（8 月在 GB200 上冷编译 KDA 约 7 分钟就撞过）。手动给别的行开 compile：`bash $K8S cell measure <行> MN_COMPILE=1 MN_NCCL_INIT_TIMEOUT=1800`；
+- `MN_COMPILE=1`：这一行开 compile（清单默认 0）。开 compile 时 `launch.sh` 自动把初始化和第 1 步的 NCCL 超时抬到 1800 秒（`MN_NCCL_INIT_TIMEOUT` 可以改）：冷编译在第 1 步里可能超过 300 秒，先编完的 rank 会在第一个 collective 上等到超时（8 月在 GB200 上冷编译 KDA 约 7 分钟就撞过）。手动给别的行开 compile：`bash $K8S cell measure <行> MN_COMPILE=1`；所有行都开见第 4.2 节；
 - `MN_PROFILE_SHAPES=1`：trace 里记算子的输入形状（默认不记，录 trace 那一步拖慢得少一些）；
 - `+<标签>`：给这一行打标签，`MN_ROWS=+<标签>` 选出所有带它的行；`+optional` 的行只有被点名（行名或标签）时才跑；
 - `h200:VAR=值`：只在这种卡上生效；
@@ -343,7 +367,7 @@ tokenizer 的实际路径和 special token 的设置记在 `runs/<hw>/pipeline/a
 
 实时的卡状态来自 Together 在每个节点上装的 DCGM exporter（`gpu-operator` 命名空间）。Together 的 pod 里读不到 IB 口的字节计数器（sysfs 没有 `counters`，`perfquery` 也超时），所以跨节点流量看 PCIe 速率：开了 GPUDirect RDMA，跨节点的数据从 GPU 经 PCIe 直接到网卡。
 
-MFU 是 titan 的口径：(6 × 激活参数 + MLA 和 KDA 的注意力算子 FLOPs) × tps ÷ bf16 稠密峰值（H100 / H200 989T，B200 2.25P），和 multinode.md 的纸面口径一致。
+MFU 是 titan 的口径：(6 × 激活参数 + MLA 和 KDA 的注意力算子 FLOPs) × tps ÷ bf16 稠密峰值（H100 / H200 989T，B200 / B300 2.25P），和 multinode.md 的纸面口径一致。
 
 ### 6.2 命令
 
@@ -407,7 +431,7 @@ tensorboard --logdir $M/<格>/tt/tb
 
 要重跑时 `bash $K8S comm` 打印每个节点的结论和调优对比表。按这个顺序看：
 
-1. **RDMA 原始带宽：** 每个 IB 口单独用 `ib_write_bw` 测（主机内存，node 1 写到 node 0，不经过 NCCL）。每个口应该接近链路速率；Together 健康检查的阈值是每个设备 320 Gb/s。
+1. **RDMA 原始带宽：** 每个 IB 口单独用 `ib_write_bw` 测（主机内存，node 1 写到 node 0，不经过 NCCL）。每个口应该接近链路速率；Together 健康检查的阈值是每个设备 320 Gb/s（400G 口），preflight 用链路速率的 80%，`rdma_node1.txt` 每行最后是这个口的链路速率。
 2. **`InfiniBand: yes`：** NCCL 用了 IB。如果是 NO，按 `together/README.md` 第 4 节排查。
 3. **`GPUDirect RDMA: yes`：** 跨节点的数据直接在 GPU 和网卡之间走，不经过主机内存。如果没看到，查 `setup_node_*.log` 里的 `nvidia_peermem` 那一行。
 4. **busbw（256 MiB 以上）：** 16 卡 all_reduce 的参考值：Together 健康检查的多节点阈值 330 GB/s，Nebius 文档里 nccl-tests 的例子平均 317 GB/s。

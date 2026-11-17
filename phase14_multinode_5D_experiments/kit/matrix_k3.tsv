@@ -17,5 +17,5 @@ k3_B_ep16_keep	dp=2,cp=4,tp=2,ep=16	32768	32768	32768	MN_FSDP_KEEP=1 nosmoke
 # EP 16 across the nodes with HybridEP (NVLink inside a node, RDMA between, one copy of a token per node) against
 # NCCL's all-to-all in k3_B_ep16; needs MN_EP_LIBS=hybridep and MN_ROWS naming it (+ep_backend, or +all +ep_backend).
 k3_B_ep16_hybridep	dp=2,cp=4,tp=2,ep=16	65536	32768	65536	h200:MN_FSDP_KEEP=1 nosmoke MN_EP_BACKEND=hybridep +optional +ep_backend
-# The fastest 11-08 layout compiled (local regions and flex autotuning; the cache stays on the shared volume); a cold compile in step 1 can outlast the 300 s first-step NCCL timeout, hence 1800 s.
-k3_A_compile	pp=2,dp=2,tp=4,ep=8	32768	16384	24576	MN_COMPILE=1 MN_NCCL_INIT_TIMEOUT=1800 nosmoke
+# The fastest 11-08 layout compiled (local regions and flex autotuning; the cache stays on the shared volume); launch.sh raises the first-step NCCL timeout for it.
+k3_A_compile	pp=2,dp=2,tp=4,ep=8	32768	16384	24576	MN_COMPILE=1 nosmoke

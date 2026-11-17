@@ -10,8 +10,9 @@ python preflight.py verdict <dir> --comm <comm dir> --nodes N   on node 0: every
 A GPU fails when its TFLOPS fall under --min-frac (0.9) of the median over all GPUs, or when a thermal or hardware
 slowdown shows up among its clock-event reasons (0x8, 0x20, 0x40, 0x80; the software power cap 0x4 is normal under a
 full GEMM and only reported). The network fails when NCCL did not use InfiniBand with GPUDirect RDMA, when an IB port's
-raw RDMA write bandwidth is under --min-rdma Gb/s (320, Together's health-check threshold), or when the all_reduce
-busbw over all GPUs at the largest message is under --min-ar GB/s (300).
+raw RDMA write bandwidth is under --rdma-frac (0.8) of its link rate (320 Gb/s on a 400G port, Together's health-check
+threshold), or when the all_reduce busbw over all GPUs at the largest message is under --min-ar GB/s per 400 Gb/s of
+port rate (300; 600 on 800G ports).
 """
 
 import argparse
@@ -122,7 +123,7 @@ def gemm(args: argparse.Namespace) -> int:
     return 0 if len(tflops) == ngpu else 1
 
 
-def network_findings(comm: Path, min_rdma: float, min_ar: float) -> list[str]:
+def network_findings(comm: Path, rdma_frac: float, min_ar: float) -> list[str]:
     bad = []
     verdict = comm / "verdict_node0.txt"
     text = verdict.read_text(errors="replace") if verdict.exists() else ""
@@ -132,10 +133,15 @@ def network_findings(comm: Path, min_rdma: float, min_ar: float) -> list[str]:
         bad.append("NCCL did not use InfiniBand")
     if "GPUDirect RDMA: yes" not in text:
         bad.append("no GPUDirect RDMA on the inter-node channels")
+    links = []
     for line in (comm / "rdma_node1.txt").read_text().splitlines() if (comm / "rdma_node1.txt").exists() else []:
         parts = line.split()
-        if len(parts) >= 2 and (parts[1] == "failed" or float(parts[1]) < min_rdma):
-            bad.append(f"RDMA {line.strip()} (under {min_rdma:.0f} Gb/s)")
+        link = float(parts[parts.index("link") + 1]) if "link" in parts else 400.0
+        link = link or 400.0
+        links.append(link)
+        if len(parts) >= 2 and (parts[1] == "failed" or float(parts[1]) < rdma_frac * link):
+            bad.append(f"RDMA {line.strip()} (under {rdma_frac:.0%} of the {link:.0f} Gb/s link)")
+    min_ar = min_ar * (statistics.median(links) / 400 if links else 1.0)
     log = comm / "comm_node0.log"
     rows = []
     for line in log.read_text(errors="replace").splitlines() if log.exists() else []:
@@ -178,7 +184,7 @@ def verdict(args: argparse.Namespace) -> int:
             if notes:
                 bad.append(line + " -> " + "; ".join(notes))
             lines.append(line)
-    bad += network_findings(Path(args.comm), args.min_rdma, args.min_ar)
+    bad += network_findings(Path(args.comm), args.rdma_frac, args.min_ar)
     head = "PREFLIGHT: PASS" if not bad else "PREFLIGHT: FAIL\n" + "\n".join("  " + b for b in bad)
     text = head + "\n" + "\n".join(lines) + "\n"
     (out / "VERDICT.txt").write_text(text)
@@ -199,7 +205,7 @@ def main() -> int:
     v.add_argument("--comm", required=True)
     v.add_argument("--nodes", type=int, default=int(os.environ.get("NNODES", "2")))
     v.add_argument("--min-frac", type=float, default=0.9)
-    v.add_argument("--min-rdma", type=float, default=320)
+    v.add_argument("--rdma-frac", type=float, default=0.8)
     v.add_argument("--min-ar", type=float, default=300)
     args = parser.parse_args()
     return gemm(args) if args.cmd == "gemm" else verdict(args)

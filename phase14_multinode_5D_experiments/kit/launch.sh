@@ -29,6 +29,8 @@ fi
 # MN_NCCL_LIB preloads a replacement NCCL (ext_build.sh nccl) ahead of the one torch bundles; summary.tsv's nccl
 # column shows the version that ran. HybridEP and DeepEP get the CUDA toolkit ext_build.sh kept on the volume.
 EXTRA=()
+# A cold compile in step 1 can outlast the 300 s first-step NCCL timeout (an 8-26 cold KDA compile took 7 minutes).
+[ "${MN_COMPILE:-1}" = 0 ] || EXTRA+=(MN_NCCL_INIT_TIMEOUT=${MN_NCCL_INIT_TIMEOUT:-1800})
 [ -z "${MN_NCCL_LIB:-}" ] || EXTRA+=(LD_PRELOAD=$MN_NCCL_LIB)
 if [ "${MN_EP_BACKEND:-standard}" != standard ]; then
   CUDA_DIR=$(ls -d $B/cuda-* 2>/dev/null | tail -n 1)

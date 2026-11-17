@@ -148,7 +148,7 @@ def matrix_rows(model: str) -> list[dict]:
         if not line.strip() or line.startswith("#"):
             continue
         name, cell, s_h100, s_h200, s_a100, extra = (line.split("\t") + [""] * 6)[:6]
-        seq = {"h100": s_h100, "h200": s_h200, "b200": s_h200}.get(HW, s_a100)
+        seq = {"h100": s_h100, "h200": s_h200, "b200": s_h200, "b300": s_h200}.get(HW, s_a100)
         envs, nosmoke, tags = {}, False, []
         for item in extra.split():
             key = item.split("=", 1)[0]
@@ -158,7 +158,7 @@ def matrix_rows(model: str) -> list[dict]:
                 tags.append(item[1:])
             elif ":" in key:
                 tag, kv = item.split(":", 1)
-                if tag == HW or (HW == "b200" and tag == "h200"):
+                if tag == HW or (HW in ("b200", "b300") and tag == "h200"):
                     k, v = kv.split("=", 1)
                     envs[k] = v
             elif "=" in item:
@@ -180,6 +180,7 @@ def build_tasks() -> list[dict]:
             return True
         return r["name"] in only or any("+" + tag in only for tag in r["tags"])
 
+    compiled = ENV.get("MN_COMPILE", "1") != "0"
     tasks = [dict(id="preflight", kind="preflight")] if ENV.get("MN_PREFLIGHT", "1") != "0" else []
     tasks += [dict(id="comm", kind="comm")] if ENV.get("MN_COMM", "1") == "1" else []
     if set(stages) & {"probe", "warm", "measure"}:
@@ -191,6 +192,11 @@ def build_tasks() -> list[dict]:
             cells.sort(key=lambda c: [r["name"] for r in rows].index(c[1]["name"]))
         for st, r in cells:
             if st == "smoke" and r["nosmoke"]:
+                continue
+            # With MN_COMPILE on for every row, a row that only turns compile on repeats another one.
+            if compiled and r["envs"].get("MN_COMPILE") == "1" and st == stages[0]:
+                log(f"{m}.{r['name']}: skipped, MN_COMPILE is on for every row")
+            if compiled and r["envs"].get("MN_COMPILE") == "1":
                 continue
             tasks.append(dict(id=f"{m}.{st}.{r['name']}", kind="cell", model=m, stage=st, **r))
     return tasks + comm_variants()

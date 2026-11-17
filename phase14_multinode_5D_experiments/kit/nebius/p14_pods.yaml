@@ -1,10 +1,12 @@
-# Phase 14 on Nebius Managed Kubernetes: two pods, one per node, on a node group attached to a GPU cluster
-# (InfiniBand) and to a shared filesystem (nebius/README.md, steps 1-2). kubectl apply -f p14_pods.yaml
+# Phase 14 on Nebius Managed Kubernetes: one pod per node (2, 4 or 8), on a node group attached to a GPU cluster
+# (InfiniBand) and to a shared filesystem (nebius/README.md, steps 1-2).
 # Each pod clones the kit onto the shared filesystem once, then runs kit/bootstrap.sh: packages, the shared setup,
 # and the unattended pipeline, which resumes where it stopped after a preemption (state on the shared filesystem).
-# The Indexed Job gives the pods JOB_COMPLETION_INDEX (0 / 1 = node rank) and hostnames p14-0 / p14-1; the headless
+# The Indexed Job gives the pods JOB_COMPLETION_INDEX (the node rank) and hostnames p14-0, p14-1, ...; the headless
 # Service p14 makes p14-0.p14 resolvable (MASTER_ADDR). The container is privileged so NCCL reaches the mlx5 HCAs,
-# as in Nebius's NCCL test. Edit HW (h100 / h200 / b200) and the MN_* settings below before applying.
+# as in Nebius's NCCL test; env.sh hands NCCL only the InfiniBand ports (B300 nodes also carry a BlueField-3 front-end
+# adapter). Set HW (h100 / h200 / b200 / b300) and the resources below for the node group's preset before applying
+# with kit/k8s.sh apply <2|4|8> [rows] nebius/p14_pods.yaml.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -66,7 +68,7 @@ spec:
           exec bash $L/phase14_multinode_5D_experiments/kit/bootstrap.sh
         env:
         - name: HW
-          value: h200
+          value: b300
         # Node count, with completions and parallelism above: k8s.sh apply <2|4|8> sets all three.
         - name: NNODES
           value: "2"
@@ -76,16 +78,39 @@ spec:
           value: /mnt/shared/p14
         - name: MASTER_ADDR
           value: p14-0.p14
-        # Pipeline scope: empty MN_ROWS runs every matrix row; MN_ROWS=k3_5d runs the 5D cell through all stages.
+        # The fast path (PLAYBOOK.md section 0): after setup, measure every K3 row once at 16K, VPP 2, 5 steps with a
+        # trace at step 5. On a card type the kit has not run on yet (B300), "smoke measure" first checks that every
+        # layout starts on the debug model.
         - name: MN_MODELS
-          value: "k3 m3"
+          value: "k3"
+        # Empty runs every row but the +optional ones; "+core" the rows tagged so; "+all +ep_backend" adds HybridEP.
         - name: MN_ROWS
           value: ""
+        # "warn" reports the preflight without stopping: on 800G ports its network thresholds are the 400G ones scaled
+        # by the link rate, not yet measured; "1" stops before the matrix when a check fails.
+        - name: MN_PREFLIGHT
+          value: "warn"
+        - name: MN_STAGES
+          value: "measure"
+        - name: MN_COMM
+          value: "0"
+        - name: MN_SEQ_FORCE
+          value: "16384"
+        # "1" compiles every row (a cold compile per layout; launch.sh raises the first-step NCCL timeout), "0" runs
+        # eager; with "1" the rows that only switch compile on are skipped.
+        - name: MN_COMPILE
+          value: "0"
+        - name: MN_VPP
+          value: "2"
+        - name: MEAS_STEPS
+          value: "5"
+        - name: PROFILE_FREQ
+          value: "5"
         - name: MN_ORDER
           value: row
-        # "0" leaves out the NCCL tuning runs of comm_sweep.tsv after the matrix (about 20 minutes).
-        - name: MN_COMM_SWEEP
-          value: "1"
+        # Communication libraries to build after setup (ext_build.sh), e.g. "hybridep".
+        - name: MN_EP_LIBS
+          value: ""
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: compute,utility
         - name: HF_TOKEN
@@ -94,15 +119,16 @@ spec:
               name: hf-token
               key: token
               optional: true
+        # Sized for the B300 preset 8gpu-192vcpu-2768gb; the H200 preset 8gpu-128vcpu-1600gb takes cpu 96, memory 1200Gi.
         resources:
           limits:
             nvidia.com/gpu: 8
-            cpu: 96
-            memory: 1200Gi
+            cpu: 160
+            memory: 2400Gi
           requests:
             nvidia.com/gpu: 8
-            cpu: 96
-            memory: 1200Gi
+            cpu: 160
+            memory: 2400Gi
         securityContext:
           privileged: true
           capabilities:
