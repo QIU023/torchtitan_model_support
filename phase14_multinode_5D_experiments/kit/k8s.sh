@@ -126,14 +126,17 @@ case "${1:-status}" in
       [ -z "${MN_COMPILE:-}" ] || echo ", MN_COMPILE=$MN_COMPILE");" "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
   status)
     kubectl get pods -n "$NS" -l "job-name=$JOB" -o wide
-    on "$(any)" "
-      [ -f $BASE/SETUP_OK ] && echo 'setup: done' || { echo 'setup: running'; tail -n 3 $BASE/setup_*.log 2>/dev/null; }
-      [ -f $BASE/STOP ] && echo 'STOP is set'
+    p=$(any)
+    on "$p" "[ -f $BASE/SETUP_OK ] && echo 'setup: done' || { echo 'setup: running'; tail -n 3 $BASE/setup_*.log 2>/dev/null; }
+      [ -f $BASE/STOP ] && echo 'STOP is set'; true"
+    # progress.py goes in through stdin, so it works before the kit on the volume is synced.
+    kubectl exec -i -n "$NS" "$p" -- bash -c "py=$PY; [ -x \$py ] || py=python3; \$py - $RUNS/*/pipeline" \
+      < "$HERE/kit/progress.py" || true
+    on "$p" "
       for s in $RUNS/*/pipeline; do
         [ -d \$s ] || continue
-        echo \"== \$s: \$(ls \$s/done 2>/dev/null | wc -l) done, \$(ls \$s/giveup 2>/dev/null | wc -l) given up\"
-        for h in \$s/hb/node*; do [ -f \$h ] && echo \"\$(basename \$h): \$(cat \$h)\"; done
-        tail -n 6 \$s/log_node0.txt 2>/dev/null
+        echo \"-- newest decisions (\$s/log_node0.txt)\"
+        tail -n 4 \$s/log_node0.txt 2>/dev/null
         cat \$s/../comm/verdict_node0.txt 2>/dev/null | head -n 3
         head -n 12 \$s/../preflight/VERDICT.txt 2>/dev/null
         [ -f \$s/REPORT.txt ] && cat \$s/REPORT.txt
