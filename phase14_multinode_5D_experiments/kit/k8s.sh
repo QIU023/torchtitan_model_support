@@ -3,8 +3,9 @@
 # from your own machine; kubectl must point at the cluster. The pods run the pipeline by themselves (bootstrap.sh,
 # pipeline.py).
 #   k8s.sh apply <2|4|8> [rows] [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes;
-#                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer); MN_COMPILE=1 or 0
-#                              in your environment sets the manifest's MN_COMPILE (1 compiles every row). Each apply
+#                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer); MN_COMPILE and
+#                              MN_PREFLIGHT in your environment set the manifest's values (MN_COMPILE=1 compiles every
+#                              row, MN_PREFLIGHT=0 skips the preflight). Each apply
 #                              stamps MN_APPLY_ID, so the pods take the kit from GitHub main and drop the volume's
 #                              previous scope.env and STOP once (push kit changes before applying)
 #   k8s.sh status              pods, setup, both heartbeats, the last pipeline decisions, REPORT.txt once finished
@@ -118,12 +119,17 @@ case "${1:-status}" in
     manifest=${4:-$HERE/kit/together/p14_pods.yaml}
     rowsed=()
     [ "$rows" = __manifest__ ] || rowsed=(-e "/name: MN_ROWS/{n;s/value: .*/value: \"$rows\"/}")
-    [ -z "${MN_COMPILE:-}" ] || rowsed+=(-e "/name: MN_COMPILE/{n;s/value: .*/value: \"$MN_COMPILE\"/}")
+    set_vars=""
+    for v in MN_COMPILE MN_PREFLIGHT; do
+      [ -z "${!v:-}" ] && continue
+      rowsed+=(-e "/name: $v\$/{n;s/value: .*/value: \"${!v}\"/}")
+      set_vars+=", $v=${!v}"
+    done
     rowsed+=(-e "/name: MN_APPLY_ID/{n;s/value: .*/value: \"$(date +%Y%m%d_%H%M%S)\"/}")
     sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" \
       "${rowsed[@]}" "$manifest" | kubectl apply -f -
-    echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'")$(
-      [ -z "${MN_COMPILE:-}" ] || echo ", MN_COMPILE=$MN_COMPILE");" "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
+    echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'")$set_vars;" \
+      "runs go to $BASE/runs$([ "$n" = 2 ] || echo "_n$n")" ;;
   status)
     kubectl get pods -n "$NS" -l "job-name=$JOB" -o wide
     p=$(any)
