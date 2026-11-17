@@ -25,7 +25,7 @@ PK=/mnt/shared/p14/logbook/phase14_multinode_5D_experiments/kit    # pod 里 kit
 |---|---|---|---|
 | 1 | 本机 | 充值，装 `tg` 和 `kubectl`，清单里填 `volumeName` 和 `HW` | 10 分钟 |
 | 2 | Together 控制台 | 建集群：2 个节点（32 / 64 卡见第 0.1 节）、Kubernetes、共享卷 | 等资源 |
-| 3 | 本机 | `get-credentials`，`kubectl apply` | 5 分钟 |
+| 3 | 本机 | `get-credentials`，`bash $K8S apply` | 5 分钟 |
 | 4 | pod 里自动 | 容器包、共享 setup、开跑前筛查（第 4.1 节）、tokenizer | 约 18 分钟（筛查约 3 分钟） |
 | 5 | pod 里自动 | K3 矩阵 11 行（9 种布局，加 `k3_A` 的重复行和 compile 行），每行 measure 一次：5 步，第 5 步出所有 rank 的 trace；OOM 的行长度减半重跑 | 每行 3 到 7 分钟，约 1 小时；compile 那行的编译时间没测过，另算 |
 | 6 | 本机 | 跑的时候看 dashboard；`ALL_DONE` 后 `report`、整份拉回本机、删集群 | 15 分钟 |
@@ -552,7 +552,7 @@ Together 的集群不能暂停，停止计费只能删集群。共享卷默认�
 1. （可选）`bash $K8S collect`；
 2. 在控制台删集群，不勾 "Delete attached shared volume"；
 3. 要接着跑时，在同一个区域建新集群，共享卷选这个已有的卷，卡型和驱动跟原来一样；
-4. `tg clusters get-credentials ...`，`kubectl get pv` 确认 PV 名还是卷名，再 `kubectl apply` 同一份清单；
+4. `tg clusters get-credentials ...`，`kubectl get pv` 确认 PV 名还是卷名，再 `bash $K8S apply <节点数>`。每次 `apply` 都带一个新的 `MN_APPLY_ID`，pod 第一次启动时据此把卷上的 kit 更新到 GitHub 的 main，并删掉上一轮留下的 `scope.env` 和 `STOP`（11-08 留在卷上的 `scope.env` 写着 `MN_ROWS=`、`MN_COMPILE=0`，不删会盖掉这次的设置）。被抢占后重启的 pod 是同一个 ID，不会再动它们。所以改了 kit 要先推送再 `apply`；直接 `kubectl apply` 清单不带 ID，卷上的 kit 和 scope 原样保留；
 5. pod 起来后跳过 setup，流水线从第一个没完成的任务接着跑；删集群时正在跑的那次尝试算中断，会重跑。
 
 另外几点：

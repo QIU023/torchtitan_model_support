@@ -4,7 +4,9 @@
 # pipeline.py).
 #   k8s.sh apply <2|4|8> [rows] [manifest]   apply the manifest (together/p14_pods.yaml) for that many nodes;
 #                              rows sets MN_ROWS, e.g. +core (the rows only that many nodes answer); MN_COMPILE=1 or 0
-#                              in your environment sets the manifest's MN_COMPILE (1 compiles every row)
+#                              in your environment sets the manifest's MN_COMPILE (1 compiles every row). Each apply
+#                              stamps MN_APPLY_ID, so the pods take the kit from GitHub main and drop the volume's
+#                              previous scope.env and STOP once (push kit changes before applying)
 #   k8s.sh status              pods, setup, both heartbeats, the last pipeline decisions, REPORT.txt once finished
 #   k8s.sh logs [n]            last n (30) pipeline log lines of both nodes
 #   k8s.sh shell <0|1>         interactive shell in pod 0 or 1
@@ -117,6 +119,7 @@ case "${1:-status}" in
     rowsed=()
     [ "$rows" = __manifest__ ] || rowsed=(-e "/name: MN_ROWS/{n;s/value: .*/value: \"$rows\"/}")
     [ -z "${MN_COMPILE:-}" ] || rowsed+=(-e "/name: MN_COMPILE/{n;s/value: .*/value: \"$MN_COMPILE\"/}")
+    rowsed+=(-e "/name: MN_APPLY_ID/{n;s/value: .*/value: \"$(date +%Y%m%d_%H%M%S)\"/}")
     sed -E -e "s/^( *)(completions|parallelism): [0-9]+/\1\2: $n/" -e "/name: NNODES/{n;s/value: .*/value: \"$n\"/}" \
       "${rowsed[@]}" "$manifest" | kubectl apply -f -
     echo "applied $manifest for $n nodes ($((n * 8)) GPUs)$([ "$rows" = __manifest__ ] || echo ", MN_ROWS='$rows'")$(

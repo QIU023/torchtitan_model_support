@@ -65,6 +65,20 @@ spec:
             git -C $L.tmp.$HOSTNAME sparse-checkout set phase14_multinode_5D_experiments
             mv -T $L.tmp.$HOSTNAME $L || rm -rf $L.tmp.$HOSTNAME
           fi
+          # A new k8s.sh apply (new MN_APPLY_ID) takes the kit from GitHub main and drops the previous run's scope.env
+          # and STOP, which a reused volume still holds; a pod restarted after preemption keeps all three.
+          if [ -n "${MN_APPLY_ID:-}" ]; then
+            exec 9> $MN_BASE/.apply_lock
+            flock 9
+            if [ "$(cat $MN_BASE/apply_id 2>/dev/null)" != "$MN_APPLY_ID" ]; then
+              git -C $L fetch -q --depth 1 origin main && git -C $L reset -q --hard FETCH_HEAD \
+                || echo "kit update from GitHub failed, keeping $(git -C $L log -1 --format=%h)"
+              rm -f $MN_BASE/scope.env $MN_BASE/STOP
+              echo "$MN_APPLY_ID" > $MN_BASE/apply_id
+            fi
+            exec 9>&-
+          fi
+          echo "kit at $(git -C $L log -1 --format='%h %cd' --date=short)"
           exec bash $L/phase14_multinode_5D_experiments/kit/bootstrap.sh
         env:
         - name: HW
@@ -76,6 +90,9 @@ spec:
           value: nebius
         - name: MN_BASE
           value: /mnt/shared/p14
+        # Set by k8s.sh apply at every apply (see the start command above); empty keeps the volume's kit and scope.
+        - name: MN_APPLY_ID
+          value: ""
         - name: MASTER_ADDR
           value: p14-0.p14
         # The fast path (PLAYBOOK.md section 0): after setup, measure every K3 row once at 16K, VPP 2, 5 steps with a
